@@ -47,11 +47,11 @@ function column(box: Rect, n: number): Rect[] {
   return Array.from({ length: n }, (_, i) => rect(box.x, box.y + i * (h + GAP), box.w, h));
 }
 
-const HEADER_Y = 48;
-const HEADER_H = 76;
+const HEADER_Y = 42;
+const HEADER_H = 100;
 const logoBoxes = (y = HEADER_Y, h = HEADER_H) => ({
-  leadersDeskLogo: rect(MARGIN, y, 330, h),
-  institutionLogo: rect(DESIGN_W - MARGIN - 250, y, 250, h),
+  leadersDeskLogo: rect(MARGIN, y, 300, h),
+  institutionLogo: rect(DESIGN_W - MARGIN - 220, y, 220, h),
 });
 
 /** A. Hero Editorial: headline on top, wide hero, one row of supporting photos, compact footer. */
@@ -120,7 +120,7 @@ function eventHighlights(supports: number, hasDesc: boolean): Geometry {
   }
   const navyBottom = hasDesc ? 584 : 540;
   return {
-    ...logoBoxes(28, HEADER_H),
+    ...logoBoxes(16, HEADER_H),
     headline: { ...rect(MARGIN, 168, CONTENT_W, hasDesc ? 170 : 208), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
     description: { ...rect(MARGIN, 348, CONTENT_W, 72), tone: 'dark' },
     slots: [hero, ...rest],

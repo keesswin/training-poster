@@ -293,7 +293,7 @@ try {
     await settle();
     await shot('03b-foundation');
     assert.notDeepEqual(before, await T('poster-canvas').screenshot());
-    assert.equal(await page.locator('.logo-prev img').count(), 1); // only the institution logo; Foundation has none
+    assert.equal(await page.locator('.logo-prev img').count(), 2); // Foundation's bundled default + institution logo
     await T('brand-desk').click();
     assert.equal((await T('color-navy').inputValue()).toLowerCase(), '#084a91');
     assert.equal(await page.locator('.logo-prev img').count(), 2);
