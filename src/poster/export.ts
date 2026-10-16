@@ -35,7 +35,18 @@ export async function exportPoster(doc: PosterDoc, preset: ExportPreset): Promis
   );
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
+/** Inside a hosted Artifact the frame blocks direct downloads, so use the viewer-confirmed save capability when present. */
+export async function downloadBlob(blob: Blob, filename: string) {
+  try {
+    const claude = (window as unknown as { claude?: { use: (n: string) => Promise<{ save: (r: { filename: string; data: Blob }) => Promise<unknown> } | null> } }).claude;
+    const downloads = claude ? await claude.use('downloads') : null;
+    if (downloads) {
+      await downloads.save({ filename, data: blob });
+      return;
+    }
+  } catch (e) {
+    if ((e as { code?: string })?.code === 'declined') return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
