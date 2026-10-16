@@ -1,8 +1,7 @@
 name: Deploy to GitHub Pages
 
+# Only needed if Pages Source is set to "GitHub Actions". With "Deploy from a branch" + /docs this stays idle.
 on:
-  push:
-    branches: [main, claude/modest-allen-jfvr5y]
   workflow_dispatch:
 
 permissions:

@@ -2,18 +2,20 @@
 
 The app is a static site (no server, no database), hosted on GitHub Pages or Netlify. Photos and logos never leave the employee's browser.
 
-## Option A: GitHub Pages (workflow already in the repo)
+## Option A: GitHub Pages from the `/docs` folder (simplest)
 
-`.github/workflows/pages.yml` tests, builds and publishes the site every time you push. The repo's default branch is currently `claude/modest-allen-jfvr5y` (there is no `main`, and none is needed). The workflow runs on that branch and on `main` if you ever create one.
+The built site is committed in `docs/`. After any code change, run `npm run build:pages`, commit `docs/`, and push; Pages republishes in about a minute.
 
-1. **Check your plan.** GitHub Pages works for a **public** repo on any plan. For a **private** repo (this one is private) you need GitHub Pro, Team or Enterprise. If you are on Free, either make the repo public (the logos and code become visible to everyone) or use Option B.
-2. **Turn Pages on.** Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. **Run the workflow.** Repo → **Actions → Deploy to GitHub Pages → Run workflow** (or just push a commit). It takes about a minute.
-4. **If the deploy is refused** with a branch-protection message: **Settings → Environments → github-pages → Deployment branches**, and allow the default branch.
-5. **Open the address** GitHub shows on the Pages settings page: `https://keesswin.github.io/training-poster/`. Do a full test poster: logo shows, add photos, export the PNG, copy the WhatsApp message.
-6. **Optional custom name:** Settings → Pages → Custom domain, e.g. `poster.leadersdesk.org`, plus a DNS `CNAME poster → keesswin.github.io`.
+1. **Settings → Pages → Build and deployment → Source: Deploy from a branch.**
+2. **Branch:** the repo's default branch (`claude/modest-allen-jfvr5y`), and change the folder from `/ (root)` to **`/docs`**. Click **Save**. (`/ (root)` would publish the unbuilt source and show a blank page.)
+3. Wait about a minute, then open **https://keesswin.github.io/training-poster/** (shown at the top of the Pages settings).
+4. Do one full test poster: logo shows, add photos, export the PNG, copy the WhatsApp message.
+5. Optional custom name: Settings → Pages → Custom domain, e.g. `poster.leadersdesk.org`, plus a DNS `CNAME poster → keesswin.github.io`.
 
-Every later push to the default branch redeploys automatically.
+The Pages site is public to anyone with the link, even when the repo is private. (Private Pages visibility needs GitHub Enterprise.)
+
+### Alternative: Source "GitHub Actions"
+`.github/workflows/pages.yml` can build and deploy automatically instead. Set Source to **GitHub Actions** and run the workflow from the Actions tab (**Run workflow**). It is manual-only by default; add `push:` triggers back under `on:` for auto-deploys.
 
 ## Option B: Netlify (same host as the Leaders Desk hub)
 
