@@ -17,30 +17,40 @@ const set = (k: string, v: string | null) => {
   }
 };
 
-const HEADLINES = 'ldposter.headlines';
-const MAX_HEADLINES = 25;
+export type SavedKind = 'headline' | 'institution' | 'location' | 'audience';
 
-export function loadHeadlines(): string[] {
+const KEYS: Record<SavedKind, string> = {
+  headline: 'ldposter.headlines',
+  institution: 'ldposter.institutions',
+  location: 'ldposter.locations',
+  audience: 'ldposter.audiences',
+};
+const MAX_SAVED = 25;
+const MIN_LENGTH: Record<SavedKind, number> = { headline: 3, institution: 3, location: 2, audience: 2 };
+
+export function loadSaved(kind: SavedKind): string[] {
   try {
-    const v = JSON.parse(get(HEADLINES) ?? '[]');
-    return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, MAX_HEADLINES) : [];
+    const v = JSON.parse(get(KEYS[kind]) ?? '[]');
+    return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, MAX_SAVED) : [];
   } catch {
     return [];
   }
 }
 
+export const normaliseSaved = (value: string) => value.trim().replace(/\s+/g, ' ');
+
 /** Newest first, case-insensitive de-duplication. Returns the new list. */
-export function rememberHeadline(list: string[], headline: string): string[] {
-  const h = headline.trim().replace(/\s+/g, ' ');
-  if (h.length < 3) return list;
-  const next = [h, ...list.filter((x) => x.toLowerCase() !== h.toLowerCase())].slice(0, MAX_HEADLINES);
-  set(HEADLINES, JSON.stringify(next));
+export function rememberSaved(kind: SavedKind, list: string[], value: string): string[] {
+  const v = normaliseSaved(value);
+  if (v.length < MIN_LENGTH[kind]) return list;
+  const next = [v, ...list.filter((x) => x.toLowerCase() !== v.toLowerCase())].slice(0, MAX_SAVED);
+  set(KEYS[kind], JSON.stringify(next));
   return next;
 }
 
-export function forgetHeadline(list: string[], headline: string): string[] {
-  const next = list.filter((x) => x !== headline);
-  set(HEADLINES, JSON.stringify(next));
+export function forgetSaved(kind: SavedKind, list: string[], value: string): string[] {
+  const next = list.filter((x) => x !== normaliseSaved(value));
+  set(KEYS[kind], JSON.stringify(next));
   return next;
 }
 

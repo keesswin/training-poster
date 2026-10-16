@@ -211,8 +211,24 @@ try {
     // brand logo uploaded earlier is restored too
     await p2.waitForSelector('.logo-prev img');
     await p2.close();
+    // city + audience + institution are remembered the same way
+    await T('location').fill('Coimbatore');
+    await T('audience').fill('Grade 9');
+    await T('institution').fill('GHSS Kuruchi');
+    await T('headline').focus();
+    const p3 = await context.newPage();
+    await p3.goto(url);
+    await p3.getByTestId('poster-canvas').waitFor();
+    for (const [id, v] of [['saved-cities', 'Coimbatore'], ['saved-audiences', 'Grade 9'], ['saved-institutions', 'GHSS Kuruchi']]) {
+      assert.ok((await p3.locator(`[data-testid=${id}] option`).allTextContents()).includes(v), id);
+    }
+    await p3.getByTestId('saved-cities').selectOption({ label: 'Coimbatore' });
+    assert.equal(await p3.getByTestId('location').inputValue(), 'Coimbatore');
+    await p3.getByTestId('forget-cities').click();
+    assert.ok(!(await p3.locator('[data-testid=saved-cities] option').allTextContents()).includes('Coimbatore'));
+    await p3.close();
     await T('headline').fill('Skill Development Workshop');
-    await T('forget-headline').click();
+    await T('forget-headlines').click();
     assert.ok(!(await page.locator('[data-testid=saved-headlines] option').allTextContents()).includes('Skill Development Workshop'));
   });
 

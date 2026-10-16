@@ -10,7 +10,8 @@ import { FONT_LOAD_LIST, FONT_SETS, type FontSetId } from './poster/fonts';
 import { buildMessage, DESCRIPTION_PRESETS, todayISO } from './poster/format';
 import { defaultLogoFile } from './poster/defaultLogos';
 import { copyText, shareFiles, whatsappLink } from './poster/share';
-import { forgetHeadline, loadHeadlines, loadSavedBrandLogo, rememberHeadline, saveBrandLogo } from './poster/storage';
+import SavedPicker from './components/SavedPicker';
+import { forgetSaved, loadSaved, loadSavedBrandLogo, rememberSaved, saveBrandLogo, type SavedKind } from './poster/storage';
 import type { LoadedImage, Photo, PosterDoc } from './poster/types';
 
 interface Notice {
@@ -54,7 +55,12 @@ export default function App() {
   const [fontsTick, setFontsTick] = useState(0);
   const docRef = useRef(doc);
   docRef.current = doc;
-  const [savedHeadlines, setSavedHeadlines] = useState<string[]>(() => loadHeadlines());
+  const [saved, setSaved] = useState<Record<SavedKind, string[]>>(() => ({
+    headline: loadSaved('headline'),
+    institution: loadSaved('institution'),
+    location: loadSaved('location'),
+    audience: loadSaved('audience'),
+  }));
   const [messageOverride, setMessageOverride] = useState<string | null>(null);
   const [attachOriginals, setAttachOriginals] = useState(false);
 
@@ -152,7 +158,19 @@ export default function App() {
 
   const selectBrand = (brand: BrandId) => patch({ brand, colors: { ...getBrand(brand).colors } });
 
-  const remember = () => setSavedHeadlines((l) => rememberHeadline(l, docRef.current.text.headline));
+  /** Saves the current value of one field (or all of them) so it can be picked again later. */
+  const remember = (kind?: SavedKind) => {
+    const kinds: SavedKind[] = kind ? [kind] : ['headline', 'institution', 'location', 'audience'];
+    setSaved((s) => {
+      const next = { ...s };
+      for (const k of kinds) next[k] = rememberSaved(k, s[k], docRef.current.text[k === 'headline' ? 'headline' : k]);
+      return next;
+    });
+  };
+  const forget = (kind: SavedKind, value: string) => setSaved((s) => ({ ...s, [kind]: forgetSaved(kind, s[kind], value) }));
+  const picker = (kind: SavedKind) => (
+    <SavedPicker kind={kind === 'headline' ? 'headlines' : kind === 'institution' ? 'institutions' : kind === 'location' ? 'cities' : 'audiences'} items={saved[kind]} current={doc.text[kind]} onPick={(v) => patch({ text: { ...doc.text, [kind]: v } })} onForget={(v) => forget(kind, v)} />
+  );
 
   const removePhoto = (id: string) => {
     setDoc((d) => {
@@ -333,41 +351,24 @@ export default function App() {
             <summary>Poster text</summary>
             <label>
               <span>Headline <small>(lines alternate between the two brand colours)</small></span>
-              <textarea rows={2} maxLength={80} {...text('headline')} onBlur={remember} data-testid="headline" />
+              <textarea rows={2} maxLength={80} {...text('headline')} onBlur={() => remember('headline')} data-testid="headline" />
             </label>
-            {savedHeadlines.length > 0 && (
-              <div className="saved">
-                <select
-                  id="saved-headlines"
-                  aria-label="Saved headlines"
-                  value=""
-                  onChange={(e) => e.target.value && patch({ text: { ...doc.text, headline: e.target.value } })}
-                  data-testid="saved-headlines"
-                >
-                  <option value="">Saved headlines ({savedHeadlines.length})…</option>
-                  {savedHeadlines.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" className="btn small" title="Forget the headline currently in the box" disabled={!savedHeadlines.includes(doc.text.headline.trim().replace(/\s+/g, ' '))} onClick={() => setSavedHeadlines((l) => forgetHeadline(l, doc.text.headline.trim().replace(/\s+/g, ' ')))} data-testid="forget-headline">
-                  Forget
-                </button>
-              </div>
-            )}
+            {picker('headline')}
             <label>
               <span>Institution name <small>(shown in capitals)</small></span>
-              <input type="text" maxLength={80} {...text('institution')} data-testid="institution" />
+              <input type="text" maxLength={80} {...text('institution')} onBlur={() => remember('institution')} data-testid="institution" />
             </label>
+            {picker('institution')}
             <label>
               <span>Location <small>(shown in capitals)</small></span>
-              <input type="text" maxLength={60} {...text('location')} data-testid="location" />
+              <input type="text" maxLength={60} {...text('location')} onBlur={() => remember('location')} data-testid="location" />
             </label>
+            {picker('location')}
             <label>
               <span>Audience <small>(optional)</small></span>
-              <input type="text" maxLength={40} {...text('audience')} placeholder="e.g. Grade 10" data-testid="audience" />
+              <input type="text" maxLength={40} {...text('audience')} placeholder="e.g. Grade 10" onBlur={() => remember('audience')} data-testid="audience" />
             </label>
+            {picker('audience')}
             <div className="two">
               <label>
                 <span>Date</span>
