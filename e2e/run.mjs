@@ -255,26 +255,50 @@ try {
 
   await step('share falls back to copy + saved poster where the share sheet is unavailable', async () => {
     await dismissAll();
+    assert.equal(await page.getByTestId('attach-originals').count(), 0); // desktop has no share sheet, so no originals option
     const f = await dl('share', 'share-fallback.png');
     assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 });
+    assert.match(f.name, /^changed-school-\d{4}-\d{2}-\d{2}\.png$/);
     await page.waitForSelector('.notice.ok');
+    // the caption is on the clipboard even though the share dialog is skipped on desktop
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await T('message').inputValue());
+    assert.ok((await page.locator('.notice.ok').first().textContent()).includes('paste the message'));
   });
 
-  await step('share uses the native share sheet with poster (+ originals) and message when available', async () => {
-    await page.evaluate(() => {
+  await step('phone: share sheet gets poster (+ originals) and caption, and the caption is also copied', async () => {
+    const mctx = await browser.newContext({
+      viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true,
+      userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36',
+      permissions: ['clipboard-read', 'clipboard-write'],
+    });
+    await mctx.addInitScript(() => {
       window.__shared = null;
       navigator.canShare = () => true;
-      navigator.share = async (d) => { window.__shared = { n: d.files.length, names: d.files.map((f) => f.name), text: d.text }; };
+      navigator.share = async (d) => { window.__shared = { names: d.files.map((f) => f.name), types: d.files.map((f) => f.type), text: d.text }; };
     });
-    await T('attach-originals').check();
-    await T('share').click();
-    await page.waitForFunction(() => window.__shared);
-    const sh = await page.evaluate(() => window.__shared);
-    assert.equal(sh.n, 1 + 6, JSON.stringify(sh));
-    assert.equal(sh.names[0], 'leaders-desk-poster.png');
-    assert.ok(sh.text.includes('Career') || sh.text.includes('Skill'));
-    await T('attach-originals').uncheck();
-    await page.evaluate(() => { delete navigator.share; delete navigator.canShare; });
+    const mp = await mctx.newPage();
+    await mp.goto(url);
+    await mp.getByTestId('poster-canvas').waitFor();
+    await mp.getByTestId('institution').fill('GHSS Kuruchi');
+    await mp.getByTestId('date').fill('2026-10-16');
+    await mp.getByTestId('photo-input').setInputFiles([fx('photo1-landscape.jpg'), fx('photo2-portrait.jpg')]);
+    await mp.waitForFunction(() => document.querySelectorAll('[data-testid=photo-item]').length === 2);
+    await mp.getByTestId('share').click();
+    await mp.waitForFunction(() => window.__shared);
+    let sh = await mp.evaluate(() => window.__shared);
+    assert.deepEqual(sh.names, ['ghss-kuruchi-2026-10-16.png']);
+    assert.ok(sh.text.includes('GHSS Kuruchi') && sh.text.includes('16 Oct 2026'), sh.text);
+    assert.equal(await mp.evaluate(() => navigator.clipboard.readText()), sh.text);
+    await mp.waitForSelector('.notice.ok');
+    // originals option exists on phones
+    await mp.evaluate(() => { window.__shared = null; });
+    await mp.getByTestId('attach-originals').check();
+    await mp.getByTestId('share').click();
+    await mp.waitForFunction(() => window.__shared);
+    sh = await mp.evaluate(() => window.__shared);
+    assert.equal(sh.names.length, 3);
+    assert.equal(sh.names[0], 'ghss-kuruchi-2026-10-16.png');
+    await mctx.close();
   });
 
   await step('description shows on the poster (toggle) and font style changes the artwork', async () => {
@@ -324,7 +348,7 @@ try {
       const f = await dl('export', `export-${t}.png`);
       assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 }, t);
       assert.ok(f.buf.length > 100_000, 'png is not trivially small');
-      assert.equal(f.name, 'leaders-desk-poster-1080x1350.png');
+      assert.match(f.name, /^changed-school-\d{4}-\d{2}-\d{2}\.png$/, f.name);
       assert.ok((await page.locator('.notice.ok').count()) > 0);
     }
   });

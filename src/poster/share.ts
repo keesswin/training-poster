@@ -36,3 +36,13 @@ export async function shareFiles(files: File[], text: string): Promise<ShareResu
 }
 
 export const whatsappLink = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
+
+/**
+ * Phones and tablets get the native share sheet (poster + caption). On desktop the system share
+ * dialog drops the caption when a file is attached, so desktop uses copy + save instead.
+ */
+export function isMobileDevice(): boolean {
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean } };
+  if (typeof nav.userAgentData?.mobile === 'boolean') return nav.userAgentData.mobile;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}

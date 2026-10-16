@@ -89,3 +89,17 @@ export function buildMessage(doc: PosterDoc): string {
     .filter(Boolean)
     .join('\n');
 }
+
+/** "GHSS Kuruchi" + 2026-10-16 -> "ghss-kuruchi-2026-10-16.png". Falls back to "poster" without an institution. */
+export function posterFilename(t: PosterText, width = 1080): string {
+  const slug = t.institution
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/g, '');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : todayISO();
+  return `${slug || 'poster'}-${date}${width === 1080 ? '' : `-${width}px`}.png`;
+}

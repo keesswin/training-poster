@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cropSourceRect, panCrop } from './crop';
 import { TEMPLATES } from './layouts';
 import { BRANDS } from './brands';
-import { buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
+import { posterFilename, buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
 import { fitText } from './text';
 import { DESIGN_H, DESIGN_W, type PosterDoc, type PosterText, type Rect } from './types';
 
@@ -36,6 +36,20 @@ describe('layouts', () => {
       expect(area / (DESIGN_W * DESIGN_H)).toBeGreaterThan(0.5);
     });
   }
+});
+
+describe('poster filename', () => {
+  it('combines institution and date', () => {
+    expect(posterFilename({ ...text, institution: 'GHSS Kuruchi', date: '2026-10-16' })).toBe('ghss-kuruchi-2026-10-16.png');
+  });
+  it('strips punctuation and accents, caps the length, and falls back safely', () => {
+    expect(posterFilename({ ...text, institution: 'St. Mary’s Hr. Sec. School (Café)', date: '2026-01-05' })).toBe('st-mary-s-hr-sec-school-cafe-2026-01-05.png');
+    expect(posterFilename({ ...text, institution: '', date: '2026-01-05' })).toBe('poster-2026-01-05.png');
+    expect(posterFilename({ ...text, institution: 'x'.repeat(100), date: '2026-01-05' }).length).toBeLessThan(70);
+  });
+  it('marks larger exports', () => {
+    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 2160)).toBe('abc-2026-01-05-2160px.png');
+  });
 });
 
 describe('sentence case', () => {

@@ -7,9 +7,9 @@ import { downloadBlob, EXPORT_PRESETS, exportPoster } from './poster/export';
 import { MAX_PHOTOS } from './poster/layouts';
 import { BRANDS, getBrand, type BrandId } from './poster/brands';
 import { FONT_LOAD_LIST, FONT_SETS, type FontSetId } from './poster/fonts';
-import { buildMessage, DESCRIPTION_PRESETS, todayISO } from './poster/format';
+import { buildMessage, DESCRIPTION_PRESETS, posterFilename, todayISO } from './poster/format';
 import { defaultLogoFile } from './poster/defaultLogos';
-import { copyText, shareFiles, whatsappLink } from './poster/share';
+import { copyText, isMobileDevice, shareFiles, whatsappLink } from './poster/share';
 import SavedPicker from './components/SavedPicker';
 import { forgetSaved, loadSaved, loadSavedBrandLogo, rememberSaved, saveBrandLogo, type SavedKind } from './poster/storage';
 import type { LoadedImage, Photo, PosterDoc } from './poster/types';
@@ -216,7 +216,7 @@ export default function App() {
     try {
       await document.fonts.ready;
       const blob = await exportPoster(docRef.current, preset);
-      downloadBlob(blob, `leaders-desk-poster-${preset.width}x${preset.height}.png`);
+      downloadBlob(blob, posterFilename(docRef.current.text, preset.width));
       notify('ok', `Exported ${preset.width} × ${preset.height} PNG (${(blob.size / 1048576).toFixed(1)} MB).`);
     } catch (e) {
       notify('error', `Export failed: ${e instanceof Error ? e.message : 'unknown error'}`);
@@ -226,6 +226,8 @@ export default function App() {
   };
 
   const message = messageOverride ?? buildMessage(doc);
+  const messageRef = useRef(message);
+  messageRef.current = message;
 
   const doCopy = async () => {
     remember();
@@ -233,25 +235,36 @@ export default function App() {
     notify(ok ? 'ok' : 'error', ok ? 'Message copied. Paste it into WhatsApp.' : 'Couldn’t copy automatically. Select the message and copy it by hand.');
   };
 
+  const mobile = useMemo(() => isMobileDevice(), []);
+
   const doShare = async () => {
     remember();
     setBusy(true);
+    // Copy the caption first, while the click still counts as a user gesture. Whatever happens next
+    // (a share dialog that drops the text, a refused share), the message is already on the clipboard.
+    const copied = await copyText(messageRef.current);
     try {
       await document.fonts.ready;
-      const blob = await exportPoster(docRef.current, EXPORT_PRESETS[0]);
-      const poster = new File([blob], 'leaders-desk-poster.png', { type: 'image/png' });
-      const files = [poster, ...(attachOriginals ? docRef.current.photos.map((p) => p.image.file) : [])];
-      const result = await shareFiles(files, message);
-      if (result === 'unsupported') {
-        const copied = await copyText(message);
-        await downloadBlob(blob, `leaders-desk-poster-${EXPORT_PRESETS[0].width}x${EXPORT_PRESETS[0].height}.png`);
-        notify(
-          copied ? 'ok' : 'warn',
-          copied
-            ? 'This browser can’t open the share sheet. Message copied and poster saved: attach the poster in WhatsApp and paste the message.'
-            : 'This browser can’t open the share sheet. Poster saved; copy the message below by hand.',
-        );
+      const d = docRef.current;
+      const preset = EXPORT_PRESETS[0];
+      const blob = await exportPoster(d, preset);
+      const filename = posterFilename(d.text, preset.width);
+      if (mobile) {
+        const files = [new File([blob], filename, { type: 'image/png' }), ...(attachOriginals ? d.photos.map((p) => p.image.file) : [])];
+        const result = await shareFiles(files, messageRef.current);
+        if (result === 'cancelled') return;
+        if (result === 'shared') {
+          notify('ok', copied ? 'Shared. The message is also copied: paste it as the caption if WhatsApp left it out.' : 'Shared.');
+          return;
+        }
       }
+      await downloadBlob(blob, filename);
+      notify(
+        copied ? 'ok' : 'warn',
+        copied
+          ? `Message copied and poster saved as ${filename}. In WhatsApp, attach the poster, then paste the message as the caption.`
+          : `Poster saved as ${filename}. Copy the message from the box below and paste it as the caption.`,
+      );
     } catch (e) {
       notify('error', `Share failed: ${e instanceof Error ? e.message : 'unknown error'}`);
     } finally {
@@ -486,16 +499,22 @@ export default function App() {
                 </button>
               )}
             </div>
-            <label className="check">
-              <input type="checkbox" checked={attachOriginals} onChange={(e) => setAttachOriginals(e.target.checked)} data-testid="attach-originals" /> Also attach the original photos
-            </label>
+            {mobile && (
+              <label className="check">
+                <input type="checkbox" checked={attachOriginals} onChange={(e) => setAttachOriginals(e.target.checked)} data-testid="attach-originals" /> Also attach the original photos
+              </label>
+            )}
             <button type="button" className="btn wa wide" onClick={doShare} disabled={busy} data-testid="share">
-              Share poster + message
+              {mobile ? 'Share poster + message' : 'Copy message + save poster'}
             </button>
             <a className="wa-link" href={whatsappLink(message)} target="_blank" rel="noopener noreferrer" data-testid="wa-link">
               Open WhatsApp with the message only
             </a>
-            <p className="note">On a phone this opens the share sheet with the poster and message together. Elsewhere it copies the message and saves the poster so you can attach it.</p>
+            <p className="note">
+              {mobile
+                ? 'Opens the share sheet with the poster and message together. The message is also copied, in case WhatsApp leaves the caption out.'
+                : 'Copies the message and saves the poster. In WhatsApp Web or the desktop app, attach the saved poster and paste the message as its caption.'}
+            </p>
           </details>
         </aside>
       </main>
