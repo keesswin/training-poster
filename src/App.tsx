@@ -26,9 +26,9 @@ const nextId = (p: string) => `${p}${++uid}`;
 const initial: PosterDoc = {
   template: 'photo-story',
   text: {
-    headline: 'Career Awareness Program',
-    institution: 'Your School Name',
-    location: 'City, State',
+    headline: '',
+    institution: '',
+    location: '',
     audience: '',
     date: todayISO(),
     showDate: true,
@@ -217,6 +217,8 @@ export default function App() {
       await document.fonts.ready;
       const blob = await exportPoster(docRef.current, preset);
       downloadBlob(blob, posterFilename(docRef.current.text, preset.width));
+      const missing = (['headline', 'institution', 'location'] as const).filter((k) => !docRef.current.text[k].trim());
+      if (missing.length) notify('warn', `Exported without: ${missing.join(', ')}. Fill ${missing.length > 1 ? 'them' : 'it'} in and export again if that wasn’t intended.`);
       notify('ok', `Exported ${preset.width} × ${preset.height} PNG (${(blob.size / 1048576).toFixed(1)} MB).`);
     } catch (e) {
       notify('error', `Export failed: ${e instanceof Error ? e.message : 'unknown error'}`);
@@ -364,17 +366,17 @@ export default function App() {
             <summary>Poster text</summary>
             <label>
               <span>Headline <small>(lines alternate between the two brand colours)</small></span>
-              <textarea rows={2} maxLength={80} {...text('headline')} onBlur={() => remember('headline')} data-testid="headline" />
+              <textarea rows={2} maxLength={80} placeholder="e.g. Career Awareness Program" {...text('headline')} onBlur={() => remember('headline')} data-testid="headline" />
             </label>
             {picker('headline')}
             <label>
               <span>Institution name <small>(shown in capitals)</small></span>
-              <input type="text" maxLength={80} {...text('institution')} onBlur={() => remember('institution')} data-testid="institution" />
+              <input type="text" maxLength={80} placeholder="e.g. GHSS Kuruchi" {...text('institution')} onBlur={() => remember('institution')} data-testid="institution" />
             </label>
             {picker('institution')}
             <label>
               <span>Location <small>(shown in capitals)</small></span>
-              <input type="text" maxLength={60} {...text('location')} onBlur={() => remember('location')} data-testid="location" />
+              <input type="text" maxLength={60} placeholder="e.g. Coimbatore" {...text('location')} onBlur={() => remember('location')} data-testid="location" />
             </label>
             {picker('location')}
             <label>

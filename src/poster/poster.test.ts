@@ -40,15 +40,15 @@ describe('layouts', () => {
 
 describe('poster filename', () => {
   it('combines institution and date', () => {
-    expect(posterFilename({ ...text, institution: 'GHSS Kuruchi', date: '2026-10-16' })).toBe('ghss-kuruchi-2026-10-16.png');
+    expect(posterFilename({ ...text, institution: 'GHSS Kuruchi', date: '2026-10-16' })).toBe('GHSS-KURUCHI-2026-10-16.png');
   });
   it('strips punctuation and accents, caps the length, and falls back safely', () => {
-    expect(posterFilename({ ...text, institution: 'St. Mary’s Hr. Sec. School (Café)', date: '2026-01-05' })).toBe('st-mary-s-hr-sec-school-cafe-2026-01-05.png');
-    expect(posterFilename({ ...text, institution: '', date: '2026-01-05' })).toBe('poster-2026-01-05.png');
+    expect(posterFilename({ ...text, institution: 'St. Mary’s Hr. Sec. School (Café)', date: '2026-01-05' })).toBe('ST-MARY-S-HR-SEC-SCHOOL-CAFE-2026-01-05.png');
+    expect(posterFilename({ ...text, institution: '', date: '2026-01-05' })).toBe('POSTER-2026-01-05.png');
     expect(posterFilename({ ...text, institution: 'x'.repeat(100), date: '2026-01-05' }).length).toBeLessThan(70);
   });
   it('marks larger exports', () => {
-    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 2160)).toBe('abc-2026-01-05-2160px.png');
+    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 2160)).toBe('ABC-2026-01-05-2160PX.png');
   });
 });
 

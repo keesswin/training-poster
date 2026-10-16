@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { panCrop } from '../poster/crop';
+import { withSampleText } from '../poster/format';
 import { getGeometry, orderedPhotos, renderPoster } from '../poster/render';
 import { DESIGN_H, DESIGN_W, type PosterDoc } from '../poster/types';
 
@@ -38,7 +39,7 @@ export default function PosterPreview({ doc, selectedId, fontsTick, onSelect, on
     canvas.height = Math.round(DESIGN_H * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const id = requestAnimationFrame(() => renderPoster(ctx, doc, scale, { placeholders: true }));
+    const id = requestAnimationFrame(() => renderPoster(ctx, withSampleText(doc), scale, { placeholders: true }));
     return () => cancelAnimationFrame(id);
   }, [doc, cssW, fontsTick]);
 

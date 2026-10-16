@@ -124,3 +124,6 @@ input[type=date], input[type=number] { width: 100%; padding: 9px 10px; border: 1
 .btn.wa { background: #1f9d55; border-color: #1f9d55; color: #fff; }
 .wa-link { display: block; margin-top: 10px; font-size: 12px; color: var(--navy); }
 textarea[data-testid=message] { font-size: 13px; line-height: 1.45; }
+
+/* Example text in empty fields is faded so it can never be mistaken for a real value. */
+input::placeholder, textarea::placeholder { color: #8d9bb0; opacity: 0.55; font-weight: 400; }

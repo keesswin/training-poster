@@ -50,6 +50,14 @@ try {
 
   await step('empty state renders without photos', async () => { await settle(); await shot('00-empty'); });
 
+  await step('text fields start empty with faded example placeholders', async () => {
+    for (const [id, ph] of [['headline', 'e.g. Career Awareness Program'], ['institution', 'e.g. GHSS Kuruchi'], ['location', 'e.g. Coimbatore']]) {
+      assert.equal(await T(id).inputValue(), '', id);
+      assert.equal(await T(id).getAttribute('placeholder'), ph);
+    }
+    assert.ok(parseFloat(await T('institution').evaluate((el) => getComputedStyle(el, '::placeholder').opacity)) < 0.7);
+  });
+
   await step('date defaults to today, is adjustable, and Today resets it', async () => {
     const now = new Date();
     const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -258,7 +266,7 @@ try {
     assert.equal(await page.getByTestId('attach-originals').count(), 0); // desktop has no share sheet, so no originals option
     const f = await dl('share', 'share-fallback.png');
     assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 });
-    assert.match(f.name, /^changed-school-\d{4}-\d{2}-\d{2}\.png$/);
+    assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}\.png$/);
     await page.waitForSelector('.notice.ok');
     // the caption is on the clipboard even though the share dialog is skipped on desktop
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await T('message').inputValue());
@@ -286,7 +294,7 @@ try {
     await mp.getByTestId('share').click();
     await mp.waitForFunction(() => window.__shared);
     let sh = await mp.evaluate(() => window.__shared);
-    assert.deepEqual(sh.names, ['ghss-kuruchi-2026-10-16.png']);
+    assert.deepEqual(sh.names, ['GHSS-KURUCHI-2026-10-16.png']);
     assert.ok(sh.text.includes('GHSS Kuruchi') && sh.text.includes('16 Oct 2026'), sh.text);
     assert.equal(await mp.evaluate(() => navigator.clipboard.readText()), sh.text);
     await mp.waitForSelector('.notice.ok');
@@ -297,7 +305,7 @@ try {
     await mp.waitForFunction(() => window.__shared);
     sh = await mp.evaluate(() => window.__shared);
     assert.equal(sh.names.length, 3);
-    assert.equal(sh.names[0], 'ghss-kuruchi-2026-10-16.png');
+    assert.equal(sh.names[0], 'GHSS-KURUCHI-2026-10-16.png');
     await mctx.close();
   });
 
@@ -348,7 +356,7 @@ try {
       const f = await dl('export', `export-${t}.png`);
       assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 }, t);
       assert.ok(f.buf.length > 100_000, 'png is not trivially small');
-      assert.match(f.name, /^changed-school-\d{4}-\d{2}-\d{2}\.png$/, f.name);
+      assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}\.png$/, f.name);
       assert.ok((await page.locator('.notice.ok').count()) > 0);
     }
   });

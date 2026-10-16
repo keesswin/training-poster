@@ -90,16 +90,32 @@ export function buildMessage(doc: PosterDoc): string {
     .join('\n');
 }
 
-/** "GHSS Kuruchi" + 2026-10-16 -> "ghss-kuruchi-2026-10-16.png". Falls back to "poster" without an institution. */
+/** "GHSS Kuruchi" + 2026-10-16 -> "GHSS-KURUCHI-2026-10-16.png". Falls back to "POSTER" without an institution. */
 export function posterFilename(t: PosterText, width = 1080): string {
   const slug = t.institution
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
     .replace(/-+$/g, '');
   const date = /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : todayISO();
-  return `${slug || 'poster'}-${date}${width === 1080 ? '' : `-${width}px`}.png`;
+  return `${slug || 'POSTER'}-${date}${width === 1080 ? '' : `-${width}PX`}.png`;
+}
+
+/** Sample copy the live preview shows for empty fields. Never used for export. */
+export const SAMPLE_TEXT = { headline: 'Career Awareness Program', institution: 'Your School Name', location: 'City, State' } as const;
+
+export function withSampleText(doc: PosterDoc): PosterDoc {
+  const t = doc.text;
+  return {
+    ...doc,
+    text: {
+      ...t,
+      headline: t.headline.trim() ? t.headline : SAMPLE_TEXT.headline,
+      institution: t.institution.trim() ? t.institution : SAMPLE_TEXT.institution,
+      location: t.location.trim() ? t.location : SAMPLE_TEXT.location,
+    },
+  };
 }
