@@ -179,7 +179,7 @@ try {
   });
 
   await step('brand colours + pattern controls update the preview', async () => {
-    await page.locator('summary', { hasText: 'Colours' }).click();
+    await page.locator('summary', { hasText: 'Style' }).click();
     const base = await T('poster-canvas').screenshot();
     await T('pattern').fill('0');
     await settle();
@@ -218,10 +218,11 @@ try {
 
   await step('program description presets fill the box and feed the message', async () => {
     await T('institution').fill('St. Mary’s School');
-    await T('description-preset').selectOption({ label: 'Skill development workshop' });
-    assert.ok((await T('description').inputValue()).includes('{institution}'));
+    await T('audience').fill('Grade 10');
+    await T('description-preset').selectOption({ label: 'Leadership program' });
+    assert.ok((await T('description').inputValue()).includes('{audience}'));
     const msg = await T('message').inputValue();
-    assert.ok(msg.includes('St. Mary’s School') && !msg.includes('{'), msg);
+    assert.ok(msg.includes('for Grade 10.') && !msg.includes('{'), msg);
   });
 
   await step('copy message puts the text on the clipboard; manual edits stick; reset restores auto', async () => {
@@ -260,10 +261,34 @@ try {
     await page.evaluate(() => { delete navigator.share; delete navigator.canShare; });
   });
 
+  await step('description shows on the poster (toggle) and font style changes the artwork', async () => {
+    await T('description').fill('AN INTERACTIVE SESSION ON CAREERS.');
+    await settle();
+    await T('show-description').check();
+    const withDesc = await T('poster-canvas').screenshot();
+    await T('show-description').uncheck();
+    await settle();
+    const noDesc = await T('poster-canvas').screenshot();
+    assert.notDeepEqual(withDesc, noDesc);
+    await T('show-description').check();
+    await T('description-preset').selectOption({ label: 'Career awareness session' });
+    await settle();
+    await shot('06-grotesk');
+    const grotesk = await T('poster-canvas').screenshot();
+    for (const f of ['mono', 'classic']) {
+      await T('fontset').selectOption(f);
+      await settle();
+      await shot('06-font-' + f);
+      assert.notDeepEqual(grotesk, await T('poster-canvas').screenshot());
+    }
+    await T('fontset').selectOption('grotesk');
+    await settle();
+  });
+
   await step('brand switch changes palette and keeps a logo per brand', async () => {
     const before = await T('poster-canvas').screenshot();
     await T('brand-foundation').click();
-    assert.equal((await T('color-navy').inputValue()).toLowerCase(), '#0b5d46');
+    assert.equal((await T('color-navy').inputValue()).toLowerCase(), '#832840');
     assert.ok((await T('message').inputValue()).trim().endsWith('– Leaders Foundation'));
     await settle();
     await shot('03b-foundation');

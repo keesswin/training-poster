@@ -5,7 +5,7 @@ const R = ({ box: r, ...rest }: { box: Rect } & React.SVGProps<SVGRectElement>) 
 
 /** Schematic thumbnail built from the real layout geometry, so it can never drift from the output. */
 function Thumb({ id }: { id: TemplateId }) {
-  const g = TEMPLATES.find((t) => t.id === id)!.geometry(2);
+  const g = TEMPLATES.find((t) => t.id === id)!.geometry(2, true);
   const h = g.headline;
   return (
     <svg viewBox={`0 0 ${DESIGN_W} ${DESIGN_H}`} className="thumb" aria-hidden>

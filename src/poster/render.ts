@@ -1,12 +1,11 @@
 import { cropSourceRect } from './crop';
 import { getTemplate, clampSupports, MARGIN, type Geometry, type Tone } from './layouts';
 import { getBrand } from './brands';
-import { detailLines } from './format';
+import { css, getFontSet, type FontSet } from './fonts';
+import { detailLines, posterDescription } from './format';
 import { ellipsize, fitText } from './text';
 import { DESIGN_H, DESIGN_W, type LoadedImage, type PosterDoc, type Rect } from './types';
 
-export const FONT_FAMILY = "Montserrat, 'Segoe UI', system-ui, sans-serif";
-const font = (weight: number, size: number) => `${weight} ${size}px ${FONT_FAMILY}`;
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -18,7 +17,7 @@ export function orderedPhotos(doc: PosterDoc) {
 }
 
 export function getGeometry(doc: PosterDoc): Geometry {
-  return getTemplate(doc.template).geometry(clampSupports(doc.photos.length));
+  return getTemplate(doc.template).geometry(clampSupports(doc.photos.length), posterDescription(doc.text) !== '');
 }
 
 function roundRectPath(ctx: Ctx, r: Rect, radius: number) {
@@ -41,12 +40,12 @@ function drawLogo(ctx: Ctx, img: LoadedImage, box: Rect, align: 'left' | 'right'
 }
 
 /** Placeholder wordmark shown until the brand's real logo is uploaded. Shrinks to fit its box. */
-function drawWordmark(ctx: Ctx, box: Rect, parts: [string, string], navy: string, orange: string) {
+function drawWordmark(ctx: Ctx, box: Rect, parts: [string, string], navy: string, orange: string, fs: FontSet) {
   let size = 40;
-  ctx.font = font(900, size);
+  ctx.font = css(fs.display, size);
   while (size > 18 && ctx.measureText(parts[0] + parts[1]).width > box.w) {
     size -= 2;
-    ctx.font = font(900, size);
+    ctx.font = css(fs.display, size);
   }
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
@@ -87,7 +86,7 @@ function emptySlot(ctx: Ctx, r: Rect, radius: number, label: string) {
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.fillStyle = 'rgba(8,74,145,0.6)';
-  ctx.font = font(700, 28);
+  ctx.font = '700 28px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2);
@@ -133,25 +132,26 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   if (!text) return;
   const h = g.headline;
   const main = h.tone === 'dark' ? doc.colors.white : doc.colors.navy;
+  const fs = getFontSet(doc.fontSet);
   const fit = fitText(text, {
     maxWidth: h.w,
     maxHeight: h.h,
     maxLines: h.maxLines,
     maxSize: h.maxSize,
     minSize: h.minSize,
-    lineHeight: 1.0,
+    lineHeight: 1.02,
     measureAt: (size) => {
-      ctx.font = font(900, size);
+      ctx.font = css(fs.display, size);
       return { measure: (t) => ctx.measureText(t).width, space: ctx.measureText(' ').width };
     },
   });
-  ctx.font = font(900, fit.size);
+  ctx.font = css(fs.display, fit.size);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   const space = ctx.measureText(' ').width;
   fit.lines.forEach((line, i) => {
     // Baseline sits at ~0.8 of the line box for caps-heavy Montserrat.
-    const y = h.y + i * fit.lineHeight + fit.size * 0.86;
+    const y = h.y + i * fit.lineHeight + fit.size * 0.84;
     let x = h.x;
     line.words.forEach((word, wi) => {
       let out = word;
@@ -166,25 +166,58 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   });
 }
 
+/** Short program description in sentence case, up to two lines, shrinking to fit its box. */
+function drawDescription(ctx: Ctx, doc: PosterDoc, g: Geometry) {
+  const text = posterDescription(doc.text);
+  if (!text) return;
+  const d = g.description;
+  const fs = getFontSet(doc.fontSet);
+  const fit = fitText(text, {
+    maxWidth: d.w,
+    maxHeight: d.h,
+    maxLines: 2,
+    maxSize: 30,
+    minSize: 22,
+    lineHeight: 1.3,
+    measureAt: (size) => {
+      ctx.font = css(fs.text, size);
+      return { measure: (t) => ctx.measureText(t).width, space: ctx.measureText(' ').width };
+    },
+  });
+  ctx.font = css(fs.text, fit.size);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = d.tone === 'dark' ? doc.colors.white : doc.colors.navy;
+  ctx.globalAlpha = 0.88;
+  fit.lines.forEach((line, i) => {
+    let t = line.words.join(' ');
+    if (fit.truncated && i === fit.lines.length - 1) t = ellipsize(t, d.w, (x) => ctx.measureText(x).width);
+    ctx.fillText(t, d.x, d.y + i * fit.lineHeight + fit.size * 1.0);
+  });
+  ctx.globalAlpha = 1;
+}
+
 function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   const { institution, location } = doc.text;
   const detail = detailLines(doc.text);
-  const inst = institution.trim();
-  const loc = location.trim();
+  const fs = getFontSet(doc.fontSet);
+  // Institution and location are always set in capitals so every poster reads the same.
+  const inst = institution.trim().toUpperCase();
+  const loc = location.trim().toUpperCase();
   if (!inst && !loc && !detail.length) return;
   const band = g.footer.variant === 'band';
   const r = g.footer.rect;
   const left = MARGIN;
   const right = DESIGN_W - MARGIN;
   const nameColor = band ? doc.colors.white : doc.colors.navy;
-  const nameSize = band ? 44 : 38;
-  const locSize = band ? 30 : 28;
+  const nameSize = band ? 44 : 40;
+  const locSize = band ? 26 : 24;
   const lineGap = 6;
 
   ctx.textBaseline = 'alphabetic';
   const DETAIL_MAX = 400;
   let detailW = 0;
-  ctx.font = font(700, 26);
+  ctx.font = css(fs.meta, 24);
   for (const l of detail) detailW = Math.max(detailW, Math.min(ctx.measureText(l).width, DETAIL_MAX));
   const maxLeft = right - left - (detailW ? detailW + 32 : 0);
 
@@ -193,26 +226,27 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   ctx.textAlign = 'left';
   if (inst) {
     let size = nameSize;
-    ctx.font = font(800, size);
+    ctx.font = css(fs.display, size);
     while (size > 26 && ctx.measureText(inst).width > maxLeft) {
       size -= 2;
-      ctx.font = font(800, size);
+      ctx.font = css(fs.display, size);
     }
     ctx.fillStyle = nameColor;
     ctx.fillText(ellipsize(inst, maxLeft, (t) => ctx.measureText(t).width), left, y + size * 0.85);
     y += nameSize + lineGap;
   }
   if (loc) {
-    ctx.font = font(700, locSize);
+    ctx.font = css(fs.meta, locSize);
     ctx.fillStyle = doc.colors.orange;
     ctx.fillText(ellipsize(loc, maxLeft, (t) => ctx.measureText(t).width), left, y + locSize * 0.85);
   }
   if (detail.length) {
-    ctx.font = font(700, 26);
+    ctx.font = css(fs.meta, 24);
     ctx.textAlign = 'right';
     const lh = 34;
-    const top = r.y + (r.h - lh * detail.length) / 2;
-    detail.forEach((line, i) => {
+    const top = r.y + (r.h - lh * detail.length) / 2 - 2;
+    detail.forEach((raw, i) => {
+      const line = raw.toUpperCase();
       ctx.fillStyle = i === 0 ? nameColor : doc.colors.orange;
       ctx.fillText(ellipsize(line, DETAIL_MAX, (t) => ctx.measureText(t).width), right, top + i * lh + 26);
     });
@@ -245,7 +279,7 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
   // Header logos
   const brandLogo = doc.brandLogos[doc.brand];
   if (brandLogo) drawLogo(ctx, brandLogo, g.leadersDeskLogo, 'left');
-  else drawWordmark(ctx, g.leadersDeskLogo, getBrand(doc.brand).wordmark, doc.colors.navy, doc.colors.orange);
+  else drawWordmark(ctx, g.leadersDeskLogo, getBrand(doc.brand).wordmark, doc.colors.navy, doc.colors.orange, getFontSet(doc.fontSet));
   if (doc.institutionLogo) drawLogo(ctx, doc.institutionLogo, g.institutionLogo, 'right');
 
   // Photos
@@ -262,6 +296,7 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
   }
 
   drawHeadline(ctx, doc, g);
+  drawDescription(ctx, doc, g);
   drawFooter(ctx, doc, g);
   ctx.restore();
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { cropSourceRect, panCrop } from './crop';
 import { TEMPLATES } from './layouts';
 import { BRANDS } from './brands';
-import { buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, studentsLabel, todayISO } from './format';
+import { buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
 import { fitText } from './text';
 import { DESIGN_H, DESIGN_W, type PosterDoc, type PosterText, type Rect } from './types';
 
@@ -11,11 +11,12 @@ const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w - 0.01 && b.x < a.x + a.w 
 
 describe('layouts', () => {
   for (const t of TEMPLATES) {
+    for (const desc of [false, true])
     for (let supports = 0; supports <= 5; supports++) {
-      it(`${t.id} with ${supports} supports stays on canvas without overlaps`, () => {
-        const g = t.geometry(supports);
+      it(`${t.id} with ${supports} supports${desc ? ' + description' : ''} stays on canvas without overlaps`, () => {
+        const g = t.geometry(supports, desc);
         expect(g.slots).toHaveLength(supports + 1);
-        const fixed = [g.leadersDeskLogo, g.institutionLogo, g.headline, g.footer.rect];
+        const fixed = [g.leadersDeskLogo, g.institutionLogo, g.headline, g.footer.rect, ...(desc ? [g.description] : [])];
         for (const r of [...fixed, ...g.slots]) expect(inside(r)).toBe(true);
         // photos never collide with each other or with text / logo boxes
         const all = [...g.slots.map((r) => ({ r, k: 'photo' })), ...fixed.map((r) => ({ r, k: 'fixed' }))];
@@ -25,12 +26,25 @@ describe('layouts', () => {
           }
       });
     }
-    it(`${t.id}: photos are the majority of the artwork`, () => {
-      const g = t.geometry(2);
+    it(`${t.id}: photos are the majority of the artwork even with a description`, () => {
+      const g = t.geometry(2, true);
       const area = g.slots.reduce((s, r) => s + r.w * r.h, 0);
       expect(area / (DESIGN_W * DESIGN_H)).toBeGreaterThan(0.5);
     });
   }
+});
+
+describe('sentence case', () => {
+  it('capitalises each sentence and keeps proper nouns', () => {
+    expect(sentenceCase('a session at St. Mary School. students joined.')).toBe('A session at St. Mary School. Students joined.');
+  });
+  it('lower-cases text typed in capitals', () => {
+    expect(sentenceCase('AN INTERACTIVE CAREER SESSION. FOR GRADE 10.')).toBe('An interactive career session. For grade 10.');
+  });
+  it('hides the poster description when toggled off', () => {
+    expect(posterDescription({ ...text, showDescription: false })).toBe('');
+    expect(posterDescription(text)).toContain('St. Mary’s School');
+  });
 });
 
 describe('crop', () => {
@@ -77,6 +91,7 @@ const text: PosterText = {
   showDate: true,
   students: '120',
   description: 'A session at {institution} for {students} ({audience}) on {date} in {location}.',
+  showDescription: true,
 };
 const doc = { text, brand: 'desk' } as unknown as PosterDoc;
 

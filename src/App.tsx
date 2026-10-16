@@ -6,7 +6,9 @@ import { disposeImage, loadImageFile, UploadError } from './poster/images';
 import { downloadBlob, EXPORT_PRESETS, exportPoster } from './poster/export';
 import { MAX_PHOTOS } from './poster/layouts';
 import { BRANDS, getBrand, type BrandId } from './poster/brands';
+import { FONT_LOAD_LIST, FONT_SETS, type FontSetId } from './poster/fonts';
 import { buildMessage, DESCRIPTION_PRESETS, todayISO } from './poster/format';
+import { defaultLogoFile } from './poster/defaultLogos';
 import { copyText, shareFiles, whatsappLink } from './poster/share';
 import { forgetHeadline, loadHeadlines, loadSavedBrandLogo, rememberHeadline, saveBrandLogo } from './poster/storage';
 import type { LoadedImage, Photo, PosterDoc } from './poster/types';
@@ -31,8 +33,10 @@ const initial: PosterDoc = {
     showDate: true,
     students: '',
     description: DESCRIPTION_PRESETS[0].text,
+    showDescription: true,
   },
   brand: 'desk',
+  fontSet: 'grotesk',
   colors: { ...BRANDS[0].colors },
   patternVisibility: 60,
   brandLogos: { desk: null, foundation: null },
@@ -54,11 +58,11 @@ export default function App() {
   const [messageOverride, setMessageOverride] = useState<string | null>(null);
   const [attachOriginals, setAttachOriginals] = useState(false);
 
-  // Restore each brand's last uploaded logo.
+  // Restore each brand's last uploaded logo, falling back to the bundled default in src/assets/logos.
   useEffect(() => {
     (async () => {
       for (const b of BRANDS) {
-        const file = await loadSavedBrandLogo(b.id);
+        const file = (await loadSavedBrandLogo(b.id)) ?? (await defaultLogoFile(b.id));
         if (!file) continue;
         try {
           const { image } = await loadImageFile(file, 'logo');
@@ -71,7 +75,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    Promise.all(['500', '700', '800', '900'].map((w) => document.fonts.load(`${w} 40px Montserrat`)))
+    Promise.all(FONT_LOAD_LIST.map((f) => document.fonts.load(f)))
       .then(() => document.fonts.ready)
       .then(() => setFontsTick((t) => t + 1))
       .catch(() => setFontsTick((t) => t + 1));
@@ -353,11 +357,11 @@ export default function App() {
               </div>
             )}
             <label>
-              <span>Institution name</span>
+              <span>Institution name <small>(shown in capitals)</small></span>
               <input type="text" maxLength={80} {...text('institution')} data-testid="institution" />
             </label>
             <label>
-              <span>Location</span>
+              <span>Location <small>(shown in capitals)</small></span>
               <input type="text" maxLength={60} {...text('location')} data-testid="location" />
             </label>
             <label>
@@ -405,16 +409,19 @@ export default function App() {
               </select>
             </label>
             <label>
-              <span>Description <small>(used in the share message)</small></span>
-              <textarea rows={4} maxLength={400} value={doc.text.description} onChange={(e) => patch({ text: { ...doc.text, description: e.target.value } })} data-testid="description" />
+              <span>Description <small>(on the poster and in the share message)</small></span>
+              <textarea rows={4} maxLength={240} value={doc.text.description} onChange={(e) => patch({ text: { ...doc.text, description: e.target.value } })} data-testid="description" />
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={doc.text.showDescription} onChange={(e) => patch({ text: { ...doc.text, showDescription: e.target.checked } })} data-testid="show-description" /> Show description on the poster
             </label>
             <p className="note">
-              Placeholders <code>{'{institution}'}</code> <code>{'{location}'}</code> <code>{'{date}'}</code> <code>{'{students}'}</code> <code>{'{audience}'}</code> are filled in from the fields above.
+              Shown in sentence case, two lines at most, so keep it under about 130 characters. Placeholders <code>{'{institution}'}</code> <code>{'{location}'}</code> <code>{'{date}'}</code> <code>{'{students}'}</code> <code>{'{audience}'}</code> are filled in from the fields above.
             </p>
           </details>
 
           <details>
-            <summary>Colours &amp; background</summary>
+            <summary>Style &amp; colours</summary>
             <div className="colors">
               <label>
                 <span>Primary</span> <input type="color" {...color('navy')} data-testid="color-navy" />
@@ -429,6 +436,16 @@ export default function App() {
                 Reset
               </button>
             </div>
+            <label>
+              <span>Font style</span>
+              <select value={doc.fontSet} onChange={(e) => patch({ fontSet: e.target.value as FontSetId })} data-testid="fontset">
+                {FONT_SETS.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label>
               <span>Background pattern <output>{doc.patternVisibility}%</output></span>
               <input type="range" min={0} max={100} value={doc.patternVisibility} onChange={(e) => patch({ patternVisibility: +e.target.value })} data-testid="pattern" />

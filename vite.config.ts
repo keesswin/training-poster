@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
         hosted(mode)
           ? html.replace(
               '</head>',
-              '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" /></head>',
+              '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&amp;family=Space+Grotesk:wght@500;700&amp;family=Space+Mono:wght@400;700&amp;display=swap" /></head>',
             )
           : html,
     },

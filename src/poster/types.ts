@@ -34,6 +34,7 @@ export interface BrandColors {
 }
 
 import type { BrandId } from './brands';
+import type { FontSetId } from './fonts';
 
 export type TemplateId = 'hero-editorial' | 'photo-story' | 'event-highlights';
 
@@ -50,6 +51,8 @@ export interface PosterText {
   students: string;
   /** Program description for the shared message. May contain {placeholders}. */
   description: string;
+  /** Draws the description on the poster itself (it is always used in the share message). */
+  showDescription: boolean;
 }
 
 export interface PosterDoc {
@@ -59,6 +62,7 @@ export interface PosterDoc {
   /** 0..100 */
   patternVisibility: number;
   brand: BrandId;
+  fontSet: FontSetId;
   /** One uploaded logo per brand; the selected brand's logo is drawn top-left. */
   brandLogos: Record<BrandId, LoadedImage | null>;
   institutionLogo: LoadedImage | null;

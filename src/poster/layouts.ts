@@ -20,6 +20,8 @@ export interface Geometry {
   pattern: { rect: Rect; tone: Tone };
   /** Optional small orange accent bar. */
   accent: Rect | null;
+  /** Where the program description goes (always present; only drawn when there is text). */
+  description: Rect & { tone: Tone };
 }
 
 export interface TemplateDef {
@@ -27,7 +29,8 @@ export interface TemplateDef {
   name: string;
   tagline: string;
   /** `supports` is the number of supporting photos (total photos - 1), 0..5. */
-  geometry: (supports: number) => Geometry;
+  /** `hasDescription` reserves room for the description line, which the photos give up. */
+  geometry: (supports: number, hasDescription: boolean) => Geometry;
 }
 
 const rect = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
@@ -52,8 +55,8 @@ const logoBoxes = (y = HEADER_Y, h = HEADER_H) => ({
 });
 
 /** A. Hero Editorial: headline on top, wide hero, one row of supporting photos, compact footer. */
-function heroEditorial(supports: number): Geometry {
-  const top = 366;
+function heroEditorial(supports: number, hasDesc: boolean): Geometry {
+  const top = hasDesc ? 408 : 366;
   const bottom = 1192;
   const supportH = supports > 0 ? 246 : 0;
   const heroH = bottom - top - (supports > 0 ? supportH + GAP : 0);
@@ -61,7 +64,8 @@ function heroEditorial(supports: number): Geometry {
   const rest = supports > 0 ? row(rect(MARGIN, top + heroH + GAP, CONTENT_W, supportH), supports) : [];
   return {
     ...logoBoxes(),
-    headline: { ...rect(MARGIN, 150, CONTENT_W, 200), maxLines: 3, maxSize: 104, minSize: 44, tone: 'light' },
+    headline: { ...rect(MARGIN, 150, CONTENT_W, hasDesc ? 176 : 200), maxLines: 3, maxSize: 100, minSize: 44, tone: 'light' },
+    description: { ...rect(MARGIN, 334, CONTENT_W, 62), tone: 'light' },
     slots: [hero, ...rest],
     radius: 14,
     footer: { rect: rect(MARGIN, 1216, CONTENT_W, 78), variant: 'plain' },
@@ -72,7 +76,7 @@ function heroEditorial(supports: number): Geometry {
 }
 
 /** B. Photo Story: photo-first, narrow vertical strip beside the hero, headline underneath. */
-function photoStory(supports: number): Geometry {
+function photoStory(supports: number, hasDesc: boolean): Geometry {
   const top = 148;
   const bottom = 924;
   const box = rect(MARGIN, top, CONTENT_W, bottom - top);
@@ -82,7 +86,8 @@ function photoStory(supports: number): Geometry {
   const rest = supports > 0 ? column(rect(MARGIN + heroW + GAP, top, stripW, box.h), supports) : [];
   return {
     ...logoBoxes(),
-    headline: { ...rect(MARGIN, 972, CONTENT_W, 196), maxLines: 3, maxSize: 100, minSize: 44, tone: 'light' },
+    headline: { ...rect(MARGIN, 972, CONTENT_W, hasDesc ? 150 : 196), maxLines: 3, maxSize: 96, minSize: 44, tone: 'light' },
+    description: { ...rect(MARGIN, 1130, CONTENT_W, 72), tone: 'light' },
     slots: [hero, ...rest],
     radius: 14,
     footer: { rect: rect(MARGIN, 1216, CONTENT_W, 78), variant: 'plain' },
@@ -100,9 +105,10 @@ function galleryRows(n: number): number[] {
 }
 
 /** C. Event Highlights: navy headline band, hero overlapping it, balanced gallery, navy identity band. */
-function eventHighlights(supports: number): Geometry {
-  const heroTop = 396;
-  const galleryBottom = 1210;
+function eventHighlights(supports: number, hasDesc: boolean): Geometry {
+  const heroTop = hasDesc ? 440 : 396;
+  const galleryBottom = hasDesc ? 1230 : 1210;
+  const bandTop = hasDesc ? 1252 : 1234;
   const rows = galleryRows(supports);
   const galleryH = rows.length === 0 ? 0 : rows.length === 1 ? 320 : 330;
   const heroBottom = rows.length ? galleryBottom - galleryH - GAP : galleryBottom;
@@ -112,14 +118,15 @@ function eventHighlights(supports: number): Geometry {
     const cells = column(rect(MARGIN, heroBottom + GAP, CONTENT_W, galleryH), rows.length);
     rows.forEach((n, i) => rest.push(...row(cells[i], n)));
   }
-  const navyBottom = 540;
+  const navyBottom = hasDesc ? 584 : 540;
   return {
     ...logoBoxes(28, HEADER_H),
-    headline: { ...rect(MARGIN, 168, CONTENT_W, 208), maxLines: 3, maxSize: 104, minSize: 44, tone: 'dark' },
+    headline: { ...rect(MARGIN, 168, CONTENT_W, hasDesc ? 170 : 208), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
+    description: { ...rect(MARGIN, 348, CONTENT_W, 72), tone: 'dark' },
     slots: [hero, ...rest],
     radius: 10,
-    footer: { rect: rect(0, 1234, DESIGN_W, DESIGN_H - 1234), variant: 'band' },
-    navyBands: [rect(0, 132, DESIGN_W, navyBottom - 132), rect(0, 1234, DESIGN_W, DESIGN_H - 1234)],
+    footer: { rect: rect(0, bandTop, DESIGN_W, DESIGN_H - bandTop), variant: 'band' },
+    navyBands: [rect(0, 132, DESIGN_W, navyBottom - 132), rect(0, bandTop, DESIGN_W, DESIGN_H - bandTop)],
     pattern: { rect: rect(0, 132, DESIGN_W, navyBottom - 132), tone: 'dark' },
     accent: null,
   };

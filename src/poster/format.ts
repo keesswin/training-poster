@@ -34,13 +34,32 @@ export interface DescriptionPreset {
 
 /** Placeholders {institution} {location} {date} {students} {audience} are filled in when the message is built. */
 export const DESCRIPTION_PRESETS: DescriptionPreset[] = [
-  { label: 'Career awareness session', text: 'An interactive career awareness session at {institution}, helping {audience} explore career options, required skills and pathways after school.' },
-  { label: 'Skill development workshop', text: 'A hands-on skill development workshop for {students} at {institution}, building communication, confidence and workplace-ready skills.' },
-  { label: 'Leadership program', text: 'A leadership program at {institution} that helped {audience} build teamwork, decision-making and public-speaking skills.' },
-  { label: 'Motivational talk', text: 'A motivational session at {institution} encouraging {audience} to set goals and take the first step towards their future.' },
-  { label: 'Orientation / induction', text: 'An orientation program for {audience} at {institution}, introducing the journey ahead and how to make the most of it.' },
-  { label: 'Parents & teachers meet', text: 'An awareness meet for parents and teachers at {institution}, on guiding students towards the right career choices.' },
+  { label: 'Career awareness session', text: 'An interactive session on career options, skills and pathways after school for {audience}.' },
+  { label: 'Skill development workshop', text: 'A hands-on workshop building communication, confidence and workplace-ready skills.' },
+  { label: 'Leadership program', text: 'A leadership program on teamwork, decision-making and public speaking for {audience}.' },
+  { label: 'Motivational talk', text: 'A motivational session encouraging {audience} to set goals and take the first step.' },
+  { label: 'Orientation / induction', text: 'An orientation introducing {audience} to the journey ahead and how to make the most of it.' },
+  { label: 'Parents & teachers meet', text: 'An awareness meet for parents and teachers on guiding students to the right career choices.' },
 ];
+
+/**
+ * Sentence case: first letter of each sentence capitalised. Text typed mostly in capitals is
+ * lower-cased first; otherwise the rest is left as typed so names and acronyms survive.
+ */
+export function sentenceCase(input: string): string {
+  const t = input.replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  const letters = t.replace(/[^\p{L}]/gu, '');
+  const upper = letters.replace(/[^\p{Lu}]/gu, '');
+  const base = letters.length > 3 && upper.length / letters.length > 0.6 ? t.toLowerCase() : t;
+  return base.replace(/(^|[.!?]\s+)(\p{L})/gu, (_m, pre: string, ch: string) => pre + ch.toUpperCase());
+}
+
+/** The description exactly as drawn on the poster. */
+export function posterDescription(t: PosterText): string {
+  if (!t.showDescription) return '';
+  return sentenceCase(fillPlaceholders(t.description.trim(), t));
+}
 
 export function fillPlaceholders(text: string, t: PosterText) {
   const fallback: Record<string, string> = {
@@ -59,7 +78,7 @@ export function buildMessage(doc: PosterDoc): string {
   const brand = getBrand(doc.brand);
   const place = [t.institution.trim(), t.location.trim()].filter(Boolean).join(', ');
   const facts = [t.showDate ? formatDate(t.date) : '', studentsLabel(t.students), t.audience.trim()].filter(Boolean).join(' · ');
-  const desc = fillPlaceholders(t.description.trim(), t).trim();
+  const desc = sentenceCase(fillPlaceholders(t.description.trim(), t));
   return [
     t.headline.trim() && `*${t.headline.trim()}*`,
     place,

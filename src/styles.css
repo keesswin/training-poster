@@ -5,7 +5,7 @@
   --muted: #5d6f87;
   --line: #dbe3ee;
   --bg: #eef2f7;
-  font-family: Montserrat, system-ui, sans-serif;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
   color: var(--ink);
 }
 * { box-sizing: border-box; }
@@ -17,7 +17,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 20px; background: var(--navy); color: #fff;
 }
-.topbar h1 { margin: 0; font-size: 18px; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; }
+.topbar h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; }
 .topbar h1 b { color: var(--orange); }
 .topbar h1 span { font-weight: 500; opacity: .75; text-transform: none; margin-left: 8px; font-size: 14px; }
 

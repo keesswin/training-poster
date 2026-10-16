@@ -13,8 +13,8 @@ export interface BrandDef {
 
 export const BRANDS: BrandDef[] = [
   { id: 'desk', name: 'Leaders Desk', wordmark: ['LEADERS ', 'DESK'], colors: { navy: '#084A91', orange: '#F07B00', white: '#FFFFFF' } },
-  // Palette is a stand-in until the official Leaders Foundation colours are confirmed.
-  { id: 'foundation', name: 'Leaders Foundation', wordmark: ['LEADERS ', 'FOUNDATION'], colors: { navy: '#0B5D46', orange: '#E8A317', white: '#FFFFFF' } },
+  // Maroon and tan, approximated by eye from the Leaders Foundation logo. Edit under Style & colours if the official values differ.
+  { id: 'foundation', name: 'Leaders Foundation', wordmark: ['LEADERS ', 'FOUNDATION'], colors: { navy: '#832840', orange: '#BC8F6D', white: '#FFFFFF' } },
 ];
 
 export const getBrand = (id: BrandId) => BRANDS.find((b) => b.id === id) ?? BRANDS[0];
