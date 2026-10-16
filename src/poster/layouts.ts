@@ -20,6 +20,8 @@ export interface Geometry {
   pattern: { rect: Rect; tone: Tone };
   /** Optional small orange accent bar. */
   accent: Rect | null;
+  /** Rounded white card behind the logos (used on dark templates so any logo stays legible). */
+  headerCard: (Rect & { radius: number }) | null;
   /** Where the program description goes (always present; only drawn when there is text). */
   description: Rect & { tone: Tone };
 }
@@ -72,6 +74,7 @@ function heroEditorial(supports: number, hasDesc: boolean): Geometry {
     navyBands: [],
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'light' },
     accent: null,
+    headerCard: null,
   };
 }
 
@@ -94,6 +97,7 @@ function photoStory(supports: number, hasDesc: boolean): Geometry {
     navyBands: [],
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'light' },
     accent: rect(MARGIN, 944, 88, 8),
+    headerCard: null,
   };
 }
 
@@ -104,31 +108,38 @@ function galleryRows(n: number): number[] {
   return n === 4 ? [2, 2] : [3, 2];
 }
 
-/** C. Event Highlights: navy headline band, hero overlapping it, balanced gallery, navy identity band. */
+/**
+ * C. Event Highlights: a full navy canvas. A white header card carries both logos, the headline
+ * sits large on the navy, then a rounded hero and an even gallery, with the school identity set
+ * straight onto the navy at the bottom.
+ */
 function eventHighlights(supports: number, hasDesc: boolean): Geometry {
-  const heroTop = hasDesc ? 440 : 396;
-  const galleryBottom = hasDesc ? 1230 : 1210;
-  const bandTop = hasDesc ? 1252 : 1234;
+  const M = 48;
+  const W = DESIGN_W - M * 2;
+  const card = rect(M, 40, W, 108);
+  const top = hasDesc ? 444 : 402;
+  const bottom = 1224;
   const rows = galleryRows(supports);
-  const galleryH = rows.length === 0 ? 0 : rows.length === 1 ? 320 : 330;
-  const heroBottom = rows.length ? galleryBottom - galleryH - GAP : galleryBottom;
-  const hero = rect(MARGIN, heroTop, CONTENT_W, heroBottom - heroTop);
+  const galleryH = rows.length === 0 ? 0 : rows.length === 1 ? 300 : 320;
+  const heroBottom = rows.length ? bottom - galleryH - GAP : bottom;
+  const hero = rect(M, top, W, heroBottom - top);
   const rest: Rect[] = [];
   if (rows.length) {
-    const cells = column(rect(MARGIN, heroBottom + GAP, CONTENT_W, galleryH), rows.length);
+    const cells = column(rect(M, heroBottom + GAP, W, galleryH), rows.length);
     rows.forEach((n, i) => rest.push(...row(cells[i], n)));
   }
-  const navyBottom = hasDesc ? 584 : 540;
   return {
-    ...logoBoxes(16, HEADER_H),
-    headline: { ...rect(MARGIN, 168, CONTENT_W, hasDesc ? 170 : 208), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
-    description: { ...rect(MARGIN, 348, CONTENT_W, 72), tone: 'dark' },
+    leadersDeskLogo: rect(card.x + 28, card.y + 6, 300, card.h - 12),
+    institutionLogo: rect(card.x + card.w - 28 - 220, card.y + 6, 220, card.h - 12),
+    headerCard: { ...card, radius: 26 },
+    headline: { ...rect(M, 184, W, hasDesc ? 164 : 206), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
+    description: { ...rect(M, 356, W, 66), tone: 'dark' },
     slots: [hero, ...rest],
-    radius: 10,
-    footer: { rect: rect(0, bandTop, DESIGN_W, DESIGN_H - bandTop), variant: 'band' },
-    navyBands: [rect(0, 132, DESIGN_W, navyBottom - 132), rect(0, bandTop, DESIGN_W, DESIGN_H - bandTop)],
-    pattern: { rect: rect(0, 132, DESIGN_W, navyBottom - 132), tone: 'dark' },
-    accent: null,
+    radius: 22,
+    footer: { rect: rect(M, 1246, W, 72), variant: 'band' },
+    navyBands: [rect(0, 0, DESIGN_W, DESIGN_H)],
+    pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'dark' },
+    accent: rect(M, 166, 64, 6),
   };
 }
 

@@ -16,6 +16,10 @@ describe('layouts', () => {
       it(`${t.id} with ${supports} supports${desc ? ' + description' : ''} stays on canvas without overlaps`, () => {
         const g = t.geometry(supports, desc);
         expect(g.slots).toHaveLength(supports + 1);
+        if (g.headerCard) {
+          for (const r of [g.headline, g.footer.rect, ...g.slots, ...(desc ? [g.description] : [])]) expect(overlap(g.headerCard, r)).toBe(false);
+          for (const r of [g.leadersDeskLogo, g.institutionLogo]) expect(inside(r) && r.x >= g.headerCard.x && r.x + r.w <= g.headerCard.x + g.headerCard.w).toBe(true);
+        }
         const fixed = [g.leadersDeskLogo, g.institutionLogo, g.headline, g.footer.rect, ...(desc ? [g.description] : [])];
         for (const r of [...fixed, ...g.slots]) expect(inside(r)).toBe(true);
         // photos never collide with each other or with text / logo boxes

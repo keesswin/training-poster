@@ -75,17 +75,17 @@ function drawPhoto(ctx: Ctx, photo: ReturnType<typeof orderedPhotos>[number], r:
   ctx.restore();
 }
 
-function emptySlot(ctx: Ctx, r: Rect, radius: number, label: string) {
+function emptySlot(ctx: Ctx, r: Rect, radius: number, label: string, dark: boolean) {
   ctx.save();
   roundRectPath(ctx, r, radius);
-  ctx.fillStyle = 'rgba(8,74,145,0.07)';
+  ctx.fillStyle = dark ? 'rgba(255,255,255,0.08)' : 'rgba(8,74,145,0.07)';
   ctx.fill();
   ctx.setLineDash([10, 10]);
-  ctx.strokeStyle = 'rgba(8,74,145,0.35)';
+  ctx.strokeStyle = dark ? 'rgba(255,255,255,0.45)' : 'rgba(8,74,145,0.35)';
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(8,74,145,0.6)';
+  ctx.fillStyle = dark ? 'rgba(255,255,255,0.8)' : 'rgba(8,74,145,0.6)';
   ctx.font = '700 28px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -207,8 +207,8 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   if (!inst && !loc && !detail.length) return;
   const band = g.footer.variant === 'band';
   const r = g.footer.rect;
-  const left = MARGIN;
-  const right = DESIGN_W - MARGIN;
+  const left = r.x > 0 ? r.x : MARGIN;
+  const right = r.x > 0 ? r.x + r.w : DESIGN_W - MARGIN;
   const nameColor = band ? doc.colors.white : doc.colors.navy;
   const nameSize = band ? 44 : 40;
   const locSize = band ? 26 : 24;
@@ -276,6 +276,12 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
 
   drawPattern(ctx, g.pattern.rect, g.pattern.tone, doc.patternVisibility);
 
+  if (g.headerCard) {
+    roundRectPath(ctx, g.headerCard, g.headerCard.radius);
+    ctx.fillStyle = doc.colors.white;
+    ctx.fill();
+  }
+
   // Header logos
   const brandLogo = doc.brandLogos[doc.brand];
   if (brandLogo) drawLogo(ctx, brandLogo, g.leadersDeskLogo, 'left');
@@ -287,7 +293,7 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
   g.slots.forEach((slot, i) => {
     const p = photos[i];
     if (p) drawPhoto(ctx, p, slot, g.radius);
-    else if (opts.placeholders && i === 0) emptySlot(ctx, slot, g.radius, 'Add event photos');
+    else if (opts.placeholders && i === 0) emptySlot(ctx, slot, g.radius, 'Add event photos', g.pattern.tone === 'dark');
   });
 
   if (g.accent) {

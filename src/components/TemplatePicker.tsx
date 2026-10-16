@@ -13,6 +13,7 @@ function Thumb({ id }: { id: TemplateId }) {
       {g.navyBands.map((b, i) => (
         <R key={i} box={b} fill="#084A91" />
       ))}
+      {g.headerCard && <R box={g.headerCard} rx={26} fill="#fff" />}
       <R box={{ ...g.leadersDeskLogo, y: g.leadersDeskLogo.y + 18, h: 40, w: 190 }} fill="#084A91" opacity={0.85} />
       <R box={{ x: g.institutionLogo.x + 140, y: g.institutionLogo.y + 13, w: 110, h: 50 }} fill="#9db3cf" />
       <rect x={h.x} y={h.y + 8} width={h.w * 0.9} height={44} fill={h.tone === 'dark' ? '#fff' : '#084A91'} />

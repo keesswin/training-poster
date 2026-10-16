@@ -16,9 +16,9 @@ npm run test:e2e     # builds, then drives real Chromium through upload → edit
 
 | Template | Composition |
 | --- | --- |
-| **A. Hero Editorial** (default) | Headline on top, wide hero, one row of supporting photos, compact footer |
-| **B. Photo Story** | Photo first: hero plus a narrow vertical strip, headline underneath |
-| **C. Event Highlights** | Navy headline band, hero overlapping it, balanced gallery, separate navy school-identity band |
+| **A. Hero Editorial** | Headline on top, wide hero, one row of supporting photos, compact footer |
+| **B. Photo Story** (default) | Photo first: hero plus a narrow vertical strip, headline underneath |
+| **C. Event Highlights** | Full navy canvas: white header card with both logos, large headline, rounded hero and gallery, school identity set on the navy |
 
 Each works with 1–6 photos (0–5 supporting). The hero is chosen with ★; the rest follow list order (↑/↓ or drag to reorder). Drag a photo on the poster, or use the zoom/horizontal/vertical sliders, to adjust the crop.
 

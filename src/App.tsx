@@ -24,7 +24,7 @@ let uid = 0;
 const nextId = (p: string) => `${p}${++uid}`;
 
 const initial: PosterDoc = {
-  template: 'hero-editorial',
+  template: 'photo-story',
   text: {
     headline: 'Career Awareness Program',
     institution: 'Your School Name',
