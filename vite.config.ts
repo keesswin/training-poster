@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => ({
     },
   ],
   resolve: { alias: { '~fonts': hosted(mode) ? src('fonts.hosted.ts') : src('fonts.local.ts') } },
+  // Relative asset URLs so the same build works at a domain root (Netlify) and under /training-poster/ (GitHub Pages).
+  base: './',
   build: { outDir: hosted(mode) ? 'dist-hosted' : 'dist' },
   test: { include: ['src/**/*.test.ts'], environment: 'node' },
 }));

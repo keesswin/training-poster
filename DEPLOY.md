@@ -1,16 +1,27 @@
 # Making the poster generator live for the team
 
-The app is a static site (no server, no database), hosted on Netlify like the Leaders Desk hub. Photos and logos never leave the employee's browser.
+The app is a static site (no server, no database), hosted on GitHub Pages or Netlify. Photos and logos never leave the employee's browser.
 
-## One-time setup (about 10 minutes)
+## Option A: GitHub Pages (workflow already in the repo)
 
-1. **Merge the code into `main`.** On GitHub, open a pull request from `claude/modest-allen-jfvr5y` into `main` in `keesswin/training-poster` and merge it. (Or skip this and pick that branch in step 3.)
-2. **Check the logos are in the repo:** `src/assets/logos/leaders-desk.png` and `src/assets/logos/leaders-foundation.png`. They are the default logo for each brand.
-3. **Create the site on Netlify.** Sign in at netlify.com → **Add new site → Import an existing project → GitHub** → choose `training-poster` and the production branch (`main`). Netlify reads `netlify.toml` (build `npm run build`, publish `dist`), so leave the fields as filled in and click **Deploy**.
-4. **Open the generated address** (`https://<site-name>.netlify.app`) and do a test poster end to end: logo shows, add photos, export the PNG, copy the WhatsApp message.
-5. **Give it a proper name** (recommended). Netlify → **Site configuration → Domain management → Add a domain**, e.g. `poster.leadersdesk.org`, then at your DNS provider add `CNAME  poster  →  <site-name>.netlify.app`. HTTPS is issued automatically.
+`.github/workflows/pages.yml` tests, builds and publishes the site every time you push. The repo's default branch is currently `claude/modest-allen-jfvr5y` (there is no `main`, and none is needed). The workflow runs on that branch and on `main` if you ever create one.
 
-From then on, every push to `main` redeploys automatically in about a minute.
+1. **Check your plan.** GitHub Pages works for a **public** repo on any plan. For a **private** repo (this one is private) you need GitHub Pro, Team or Enterprise. If you are on Free, either make the repo public (the logos and code become visible to everyone) or use Option B.
+2. **Turn Pages on.** Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. **Run the workflow.** Repo → **Actions → Deploy to GitHub Pages → Run workflow** (or just push a commit). It takes about a minute.
+4. **If the deploy is refused** with a branch-protection message: **Settings → Environments → github-pages → Deployment branches**, and allow the default branch.
+5. **Open the address** GitHub shows on the Pages settings page: `https://keesswin.github.io/training-poster/`. Do a full test poster: logo shows, add photos, export the PNG, copy the WhatsApp message.
+6. **Optional custom name:** Settings → Pages → Custom domain, e.g. `poster.leadersdesk.org`, plus a DNS `CNAME poster → keesswin.github.io`.
+
+Every later push to the default branch redeploys automatically.
+
+## Option B: Netlify (same host as the Leaders Desk hub)
+
+1. Netlify → **Add new site → Import an existing project → GitHub** → `training-poster` → choose the default branch → **Deploy**. Settings come from `netlify.toml`.
+2. Open the `https://<site-name>.netlify.app` address and test as above.
+3. Optional: Domain management → add `poster.leadersdesk.org` and a DNS `CNAME poster → <site-name>.netlify.app`.
+
+Netlify works with private repos on the free plan.
 
 ## Sharing with employees
 
