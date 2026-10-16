@@ -1,6 +1,8 @@
 import { cropSourceRect } from './crop';
 import { getTemplate, clampSupports, MARGIN, type Geometry, type Tone } from './layouts';
-import { ellipsize, emphasisSet, fitText, isEmphasised } from './text';
+import { getBrand } from './brands';
+import { detailLines } from './format';
+import { ellipsize, fitText } from './text';
 import { DESIGN_H, DESIGN_W, type LoadedImage, type PosterDoc, type Rect } from './types';
 
 export const FONT_FAMILY = "Montserrat, 'Segoe UI', system-ui, sans-serif";
@@ -38,18 +40,21 @@ function drawLogo(ctx: Ctx, img: LoadedImage, box: Rect, align: 'left' | 'right'
   ctx.drawImage(img.source, x, y, w, h);
 }
 
-/** Placeholder wordmark shown until the real Leaders Desk logo is uploaded. */
-function drawWordmark(ctx: Ctx, box: Rect, navy: string, orange: string) {
-  const size = 40;
+/** Placeholder wordmark shown until the brand's real logo is uploaded. Shrinks to fit its box. */
+function drawWordmark(ctx: Ctx, box: Rect, parts: [string, string], navy: string, orange: string) {
+  let size = 40;
   ctx.font = font(900, size);
+  while (size > 18 && ctx.measureText(parts[0] + parts[1]).width > box.w) {
+    size -= 2;
+    ctx.font = font(900, size);
+  }
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  const a = 'LEADERS ';
   const cy = box.y + box.h / 2;
   ctx.fillStyle = navy;
-  ctx.fillText(a, box.x, cy);
+  ctx.fillText(parts[0], box.x, cy);
   ctx.fillStyle = orange;
-  ctx.fillText('DESK', box.x + ctx.measureText(a).width, cy);
+  ctx.fillText(parts[1], box.x + ctx.measureText(parts[0]).width, cy);
 }
 
 function drawPhoto(ctx: Ctx, photo: ReturnType<typeof orderedPhotos>[number], r: Rect, radius: number) {
@@ -128,7 +133,6 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   if (!text) return;
   const h = g.headline;
   const main = h.tone === 'dark' ? doc.colors.white : doc.colors.navy;
-  const set = emphasisSet(doc.text.emphasis);
   const fit = fitText(text, {
     maxWidth: h.w,
     maxHeight: h.h,
@@ -153,7 +157,9 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
       let out = word;
       const last = fit.truncated && i === fit.lines.length - 1 && wi === line.words.length - 1;
       if (last) out = ellipsize(word, Math.max(40, h.w - (x - h.x)), (t) => ctx.measureText(t).width);
-      ctx.fillStyle = isEmphasised(word, set) ? doc.colors.orange : main;
+      // Alternate colours: line 1 main, line 2 accent, ... A one-line headline alternates by word instead.
+      const accent = fit.lines.length > 1 ? i % 2 === 1 : wi % 2 === 1;
+      ctx.fillStyle = accent ? doc.colors.orange : main;
       ctx.fillText(out, x, y);
       x += ctx.measureText(out).width + space;
     });
@@ -161,11 +167,11 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
 }
 
 function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
-  const { institution, location, detail } = doc.text;
+  const { institution, location } = doc.text;
+  const detail = detailLines(doc.text);
   const inst = institution.trim();
   const loc = location.trim();
-  const det = detail.trim();
-  if (!inst && !loc && !det) return;
+  if (!inst && !loc && !detail.length) return;
   const band = g.footer.variant === 'band';
   const r = g.footer.rect;
   const left = MARGIN;
@@ -176,11 +182,10 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   const lineGap = 6;
 
   ctx.textBaseline = 'alphabetic';
+  const DETAIL_MAX = 400;
   let detailW = 0;
-  if (det) {
-    ctx.font = font(700, 28);
-    detailW = Math.min(ctx.measureText(det).width, 340);
-  }
+  ctx.font = font(700, 26);
+  for (const l of detail) detailW = Math.max(detailW, Math.min(ctx.measureText(l).width, DETAIL_MAX));
   const maxLeft = right - left - (detailW ? detailW + 32 : 0);
 
   const blockH = (inst ? nameSize : 0) + (inst && loc ? lineGap : 0) + (loc ? locSize : 0);
@@ -202,11 +207,15 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
     ctx.fillStyle = doc.colors.orange;
     ctx.fillText(ellipsize(loc, maxLeft, (t) => ctx.measureText(t).width), left, y + locSize * 0.85);
   }
-  if (det) {
-    ctx.font = font(700, 28);
+  if (detail.length) {
+    ctx.font = font(700, 26);
     ctx.textAlign = 'right';
-    ctx.fillStyle = nameColor;
-    ctx.fillText(ellipsize(det, 340, (t) => ctx.measureText(t).width), right, r.y + r.h / 2 + 10);
+    const lh = 34;
+    const top = r.y + (r.h - lh * detail.length) / 2;
+    detail.forEach((line, i) => {
+      ctx.fillStyle = i === 0 ? nameColor : doc.colors.orange;
+      ctx.fillText(ellipsize(line, DETAIL_MAX, (t) => ctx.measureText(t).width), right, top + i * lh + 26);
+    });
   }
 }
 
@@ -234,8 +243,9 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
   drawPattern(ctx, g.pattern.rect, g.pattern.tone, doc.patternVisibility);
 
   // Header logos
-  if (doc.leadersDeskLogo) drawLogo(ctx, doc.leadersDeskLogo, g.leadersDeskLogo, 'left');
-  else drawWordmark(ctx, g.leadersDeskLogo, doc.colors.navy, doc.colors.orange);
+  const brandLogo = doc.brandLogos[doc.brand];
+  if (brandLogo) drawLogo(ctx, brandLogo, g.leadersDeskLogo, 'left');
+  else drawWordmark(ctx, g.leadersDeskLogo, getBrand(doc.brand).wordmark, doc.colors.navy, doc.colors.orange);
   if (doc.institutionLogo) drawLogo(ctx, doc.institutionLogo, g.institutionLogo, 'right');
 
   // Photos

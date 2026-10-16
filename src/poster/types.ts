@@ -13,6 +13,8 @@ export interface LoadedImage {
   /** Object URL of the untouched original file, used for editor thumbnails only. */
   url: string;
   name: string;
+  /** The untouched uploaded file, kept for sharing the originals. */
+  file: File;
 }
 
 export interface Photo {
@@ -31,16 +33,23 @@ export interface BrandColors {
   white: string;
 }
 
+import type { BrandId } from './brands';
+
 export type TemplateId = 'hero-editorial' | 'photo-story' | 'event-highlights';
 
 export interface PosterText {
   headline: string;
-  /** Words from the headline that get the orange emphasis colour. */
-  emphasis: string;
   institution: string;
   location: string;
-  /** Optional audience or date, shown only when filled in. */
-  detail: string;
+  /** Optional audience, e.g. "Grade 10". */
+  audience: string;
+  /** yyyy-mm-dd, defaults to today. */
+  date: string;
+  showDate: boolean;
+  /** Number of students; shown on the poster only when filled in. */
+  students: string;
+  /** Program description for the shared message. May contain {placeholders}. */
+  description: string;
 }
 
 export interface PosterDoc {
@@ -49,7 +58,9 @@ export interface PosterDoc {
   colors: BrandColors;
   /** 0..100 */
   patternVisibility: number;
-  leadersDeskLogo: LoadedImage | null;
+  brand: BrandId;
+  /** One uploaded logo per brand; the selected brand's logo is drawn top-left. */
+  brandLogos: Record<BrandId, LoadedImage | null>;
   institutionLogo: LoadedImage | null;
   /** Photos in user order. The hero is picked separately, supports keep list order. */
   photos: Photo[];

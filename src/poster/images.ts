@@ -63,7 +63,7 @@ export async function loadImageFile(file: File, kind: ImageKind): Promise<{ imag
         : kind === 'photo' && Math.max(width, height) < 900
           ? `“${file.name}” is low resolution (${width}×${height}px); it may look soft at full size.`
           : undefined;
-    return { image: { source, width, height, url, name: file.name }, warning };
+    return { image: { source, width, height, url, name: file.name, file }, warning };
   } catch (e) {
     URL.revokeObjectURL(url);
     if (e instanceof UploadError) throw e;

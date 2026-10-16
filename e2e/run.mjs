@@ -26,7 +26,8 @@ let passed = 0;
 const step = async (name, fn) => { await fn(); passed++; console.log('  ✓', name); };
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
-const page = await browser.newPage({ viewport: { width: 1360, height: 900 }, acceptDownloads: true });
+const context = await browser.newContext({ viewport: { width: 1360, height: 2000 }, acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
+const page = await context.newPage();
 const errors = [];
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 page.on('pageerror', (e) => errors.push(String(e)));
@@ -49,8 +50,18 @@ try {
 
   await step('empty state renders without photos', async () => { await settle(); await shot('00-empty'); });
 
+  await step('date defaults to today, is adjustable, and Today resets it', async () => {
+    const now = new Date();
+    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    assert.equal(await T('date').inputValue(), iso);
+    await T('date').fill('2025-01-02');
+    assert.ok((await T('message').inputValue()).includes('2 Jan 2025'));
+    await T('date-today').click();
+    assert.equal(await T('date').inputValue(), iso);
+  });
+
   await step('uploads Leaders Desk + institution logos (PNG and SVG)', async () => {
-    await T('ld-logo-input').setInputFiles(fx('leadersdesk-logo.png'));
+    await T('brand-logo-input').setInputFiles(fx('leadersdesk-logo.png'));
     await T('inst-logo-input').setInputFiles(fx('school-logo.png'));
     await page.waitForSelector('.logo-prev img >> nth=1');
     assert.equal(await page.locator('.logo-prev img').count(), 2);
@@ -128,11 +139,20 @@ try {
 
   await step('edits headline, emphasis, footer text, optional detail', async () => {
     await T('headline').fill('Career Awareness Program');
-    await T('emphasis').fill('Career');
     await T('institution').fill('St. Mary’s Higher Secondary School');
     await T('location').fill('Chennai, Tamil Nadu');
-    await T('detail').fill('Grade 10 · 12 Oct 2026');
+    await T('audience').fill('Grade 10');
+    await T('date').fill('2026-10-12');
+    await T('students').fill('120');
     await settle();
+  });
+
+  await step('students: digits only, shows in the message', async () => {
+    await T('students').fill('');
+    await T('students').pressSequentially('a1b2');
+    assert.equal(await T('students').inputValue(), '12');
+    await T('students').fill('120');
+    assert.ok((await T('message').inputValue()).includes('120 students'));
   });
 
   await step('crop: zoom + sliders + canvas drag change the crop', async () => {
@@ -159,7 +179,7 @@ try {
   });
 
   await step('brand colours + pattern controls update the preview', async () => {
-    await page.locator('summary', { hasText: 'Brand' }).click();
+    await page.locator('summary', { hasText: 'Colours' }).click();
     const base = await T('poster-canvas').screenshot();
     await T('pattern').fill('0');
     await settle();
@@ -172,6 +192,86 @@ try {
     await T('color-orange').fill('#f07b00');
     await T('pattern').fill('60');
     await settle();
+  });
+
+  await step('headline is remembered, offered in a dropdown, survives reload, can be forgotten', async () => {
+    await T('headline').fill('Skill Development Workshop');
+    await T('institution').focus(); // blur saves it
+    await T('headline').fill('Career Awareness Program');
+    await T('institution').focus();
+    const opts = await page.locator('[data-testid=saved-headlines] option').allTextContents();
+    assert.ok(opts.some((o) => o === 'Skill Development Workshop') && opts.some((o) => o === 'Career Awareness Program'), opts.join('|'));
+    await T('saved-headlines').selectOption({ label: 'Skill Development Workshop' });
+    assert.equal(await T('headline').inputValue(), 'Skill Development Workshop');
+    const p2 = await context.newPage(); // a fresh load in the same browser profile
+    await p2.goto(url);
+    await p2.getByTestId('poster-canvas').waitFor();
+    const after = await p2.locator('[data-testid=saved-headlines] option').allTextContents();
+    assert.ok(after.includes('Skill Development Workshop'), 'persisted: ' + after.join('|'));
+    // brand logo uploaded earlier is restored too
+    await p2.waitForSelector('.logo-prev img');
+    await p2.close();
+    await T('headline').fill('Skill Development Workshop');
+    await T('forget-headline').click();
+    assert.ok(!(await page.locator('[data-testid=saved-headlines] option').allTextContents()).includes('Skill Development Workshop'));
+  });
+
+  await step('program description presets fill the box and feed the message', async () => {
+    await T('institution').fill('St. Mary’s School');
+    await T('description-preset').selectOption({ label: 'Skill development workshop' });
+    assert.ok((await T('description').inputValue()).includes('{institution}'));
+    const msg = await T('message').inputValue();
+    assert.ok(msg.includes('St. Mary’s School') && !msg.includes('{'), msg);
+  });
+
+  await step('copy message puts the text on the clipboard; manual edits stick; reset restores auto', async () => {
+    await T('copy-message').click();
+    await page.waitForSelector('.notice.ok');
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await T('message').inputValue());
+    await T('message').fill('custom text');
+    await T('institution').fill('Changed School');
+    assert.equal(await T('message').inputValue(), 'custom text');
+    await T('reset-message').click();
+    assert.ok((await T('message').inputValue()).includes('Changed School'));
+    assert.ok((await T('wa-link').getAttribute('href')).startsWith('https://wa.me/?text='));
+  });
+
+  await step('share falls back to copy + saved poster where the share sheet is unavailable', async () => {
+    await dismissAll();
+    const f = await dl('share', 'share-fallback.png');
+    assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 });
+    await page.waitForSelector('.notice.ok');
+  });
+
+  await step('share uses the native share sheet with poster (+ originals) and message when available', async () => {
+    await page.evaluate(() => {
+      window.__shared = null;
+      navigator.canShare = () => true;
+      navigator.share = async (d) => { window.__shared = { n: d.files.length, names: d.files.map((f) => f.name), text: d.text }; };
+    });
+    await T('attach-originals').check();
+    await T('share').click();
+    await page.waitForFunction(() => window.__shared);
+    const sh = await page.evaluate(() => window.__shared);
+    assert.equal(sh.n, 1 + 6, JSON.stringify(sh));
+    assert.equal(sh.names[0], 'leaders-desk-poster.png');
+    assert.ok(sh.text.includes('Career') || sh.text.includes('Skill'));
+    await T('attach-originals').uncheck();
+    await page.evaluate(() => { delete navigator.share; delete navigator.canShare; });
+  });
+
+  await step('brand switch changes palette and keeps a logo per brand', async () => {
+    const before = await T('poster-canvas').screenshot();
+    await T('brand-foundation').click();
+    assert.equal((await T('color-navy').inputValue()).toLowerCase(), '#0b5d46');
+    assert.ok((await T('message').inputValue()).trim().endsWith('– Leaders Foundation'));
+    await settle();
+    await shot('03b-foundation');
+    assert.notDeepEqual(before, await T('poster-canvas').screenshot());
+    assert.equal(await page.locator('.logo-prev img').count(), 1); // only the institution logo; Foundation has none
+    await T('brand-desk').click();
+    assert.equal((await T('color-navy').inputValue()).toLowerCase(), '#084a91');
+    assert.equal(await page.locator('.logo-prev img').count(), 2);
   });
 
   const templates = ['hero-editorial', 'photo-story', 'event-highlights'];

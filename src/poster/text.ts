@@ -5,22 +5,6 @@ export interface WrappedLine {
   width: number;
 }
 
-const norm = (w: string) => w.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
-
-/** Parses the comma/space separated emphasis field into a set of normalised words. */
-export function emphasisSet(emphasis: string): Set<string> {
-  return new Set(
-    emphasis
-      .split(/[\s,]+/)
-      .map(norm)
-      .filter(Boolean),
-  );
-}
-
-export function isEmphasised(word: string, set: Set<string>) {
-  return set.has(norm(word));
-}
-
 /** Greedy word wrap. Words longer than `maxWidth` get their own line (caller decides what to do). */
 export function wrapWords(text: string, maxWidth: number, measure: Measure, space: number): WrappedLine[] {
   const words = text.split(/\s+/).filter(Boolean);

@@ -5,7 +5,11 @@ import TemplatePicker from './components/TemplatePicker';
 import { disposeImage, loadImageFile, UploadError } from './poster/images';
 import { downloadBlob, EXPORT_PRESETS, exportPoster } from './poster/export';
 import { MAX_PHOTOS } from './poster/layouts';
-import { BRAND, type LoadedImage, type Photo, type PosterDoc } from './poster/types';
+import { BRANDS, getBrand, type BrandId } from './poster/brands';
+import { buildMessage, DESCRIPTION_PRESETS, todayISO } from './poster/format';
+import { copyText, shareFiles, whatsappLink } from './poster/share';
+import { forgetHeadline, loadHeadlines, loadSavedBrandLogo, rememberHeadline, saveBrandLogo } from './poster/storage';
+import type { LoadedImage, Photo, PosterDoc } from './poster/types';
 
 interface Notice {
   id: number;
@@ -20,14 +24,18 @@ const initial: PosterDoc = {
   template: 'hero-editorial',
   text: {
     headline: 'Career Awareness Program',
-    emphasis: 'Awareness',
     institution: 'Your School Name',
     location: 'City, State',
-    detail: '',
+    audience: '',
+    date: todayISO(),
+    showDate: true,
+    students: '',
+    description: DESCRIPTION_PRESETS[0].text,
   },
-  colors: { navy: BRAND.navy, orange: BRAND.orange, white: BRAND.white },
+  brand: 'desk',
+  colors: { ...BRANDS[0].colors },
   patternVisibility: 60,
-  leadersDeskLogo: null,
+  brandLogos: { desk: null, foundation: null },
   institutionLogo: null,
   photos: [],
   heroId: null,
@@ -42,6 +50,25 @@ export default function App() {
   const [fontsTick, setFontsTick] = useState(0);
   const docRef = useRef(doc);
   docRef.current = doc;
+  const [savedHeadlines, setSavedHeadlines] = useState<string[]>(() => loadHeadlines());
+  const [messageOverride, setMessageOverride] = useState<string | null>(null);
+  const [attachOriginals, setAttachOriginals] = useState(false);
+
+  // Restore each brand's last uploaded logo.
+  useEffect(() => {
+    (async () => {
+      for (const b of BRANDS) {
+        const file = await loadSavedBrandLogo(b.id);
+        if (!file) continue;
+        try {
+          const { image } = await loadImageFile(file, 'logo');
+          setDoc((d) => (d.brandLogos[b.id] ? d : { ...d, brandLogos: { ...d.brandLogos, [b.id]: image } }));
+        } catch {
+          /* a stale saved logo is ignored */
+        }
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     Promise.all(['500', '700', '800', '900'].map((w) => document.fonts.load(`${w} 40px Montserrat`)))
@@ -76,25 +103,52 @@ export default function App() {
     setSelectedId((s) => s ?? added[0].id);
   };
 
-  const setLogo = async (key: 'leadersDeskLogo' | 'institutionLogo', file: File | undefined) => {
+  const setBrandLogo = async (brand: BrandId, file: File | undefined) => {
     if (!file) return;
     try {
       const { image, warning } = await loadImageFile(file, 'logo');
       if (warning) notify('warn', warning);
       setDoc((d) => {
-        disposeImage(d[key]);
-        return { ...d, [key]: image };
+        disposeImage(d.brandLogos[brand]);
+        return { ...d, brandLogos: { ...d.brandLogos, [brand]: image } };
+      });
+      void saveBrandLogo(brand, file);
+    } catch (e) {
+      notify('error', e instanceof UploadError ? e.message : 'That logo couldn’t be loaded.');
+    }
+  };
+
+  const setInstitutionLogo = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const { image, warning } = await loadImageFile(file, 'logo');
+      if (warning) notify('warn', warning);
+      setDoc((d) => {
+        disposeImage(d.institutionLogo);
+        return { ...d, institutionLogo: image };
       });
     } catch (e) {
       notify('error', e instanceof UploadError ? e.message : 'That logo couldn’t be loaded.');
     }
   };
 
-  const clearLogo = (key: 'leadersDeskLogo' | 'institutionLogo') =>
+  const clearBrandLogo = (brand: BrandId) => {
     setDoc((d) => {
-      disposeImage(d[key] as LoadedImage | null);
-      return { ...d, [key]: null };
+      disposeImage(d.brandLogos[brand]);
+      return { ...d, brandLogos: { ...d.brandLogos, [brand]: null } };
     });
+    void saveBrandLogo(brand, null);
+  };
+
+  const clearInstitutionLogo = () =>
+    setDoc((d) => {
+      disposeImage(d.institutionLogo);
+      return { ...d, institutionLogo: null };
+    });
+
+  const selectBrand = (brand: BrandId) => patch({ brand, colors: { ...getBrand(brand).colors } });
+
+  const remember = () => setSavedHeadlines((l) => rememberHeadline(l, docRef.current.text.headline));
 
   const removePhoto = (id: string) => {
     setDoc((d) => {
@@ -136,6 +190,7 @@ export default function App() {
   const doExport = async () => {
     const preset = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
     setBusy(true);
+    remember();
     try {
       await document.fonts.ready;
       const blob = await exportPoster(docRef.current, preset);
@@ -148,7 +203,41 @@ export default function App() {
     }
   };
 
-  const text = (k: keyof PosterDoc['text']) => ({
+  const message = messageOverride ?? buildMessage(doc);
+
+  const doCopy = async () => {
+    remember();
+    const ok = await copyText(message);
+    notify(ok ? 'ok' : 'error', ok ? 'Message copied. Paste it into WhatsApp.' : 'Couldn’t copy automatically. Select the message and copy it by hand.');
+  };
+
+  const doShare = async () => {
+    remember();
+    setBusy(true);
+    try {
+      await document.fonts.ready;
+      const blob = await exportPoster(docRef.current, EXPORT_PRESETS[0]);
+      const poster = new File([blob], 'leaders-desk-poster.png', { type: 'image/png' });
+      const files = [poster, ...(attachOriginals ? docRef.current.photos.map((p) => p.image.file) : [])];
+      const result = await shareFiles(files, message);
+      if (result === 'unsupported') {
+        const copied = await copyText(message);
+        await downloadBlob(blob, `leaders-desk-poster-${EXPORT_PRESETS[0].width}x${EXPORT_PRESETS[0].height}.png`);
+        notify(
+          copied ? 'ok' : 'warn',
+          copied
+            ? 'This browser can’t open the share sheet. Message copied and poster saved: attach the poster in WhatsApp and paste the message.'
+            : 'This browser can’t open the share sheet. Poster saved; copy the message below by hand.',
+        );
+      }
+    } catch (e) {
+      notify('error', `Share failed: ${e instanceof Error ? e.message : 'unknown error'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const text = (k: 'headline' | 'institution' | 'location' | 'audience') => ({
     value: doc.text[k],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => patch({ text: { ...doc.text, [k]: e.target.value } }),
   });
@@ -188,6 +277,34 @@ export default function App() {
 
         <aside className="panel">
           <details open>
+            <summary>Brand</summary>
+            <div className="brands" role="radiogroup" aria-label="Brand">
+              {BRANDS.map((b) => (
+                <button key={b.id} type="button" role="radio" aria-checked={doc.brand === b.id} className={`brand ${doc.brand === b.id ? 'on' : ''}`} onClick={() => selectBrand(b.id)} data-testid={`brand-${b.id}`}>
+                  <span className="swatch" style={{ background: `linear-gradient(135deg, ${b.colors.navy} 55%, ${b.colors.orange} 55%)` }} />
+                  {b.name}
+                </button>
+              ))}
+            </div>
+            <LogoField
+              label={`${getBrand(doc.brand).name} logo`}
+              image={doc.brandLogos[doc.brand]}
+              fallback="Using placeholder wordmark"
+              testid="brand-logo-input"
+              onFile={(f) => setBrandLogo(doc.brand, f)}
+              onClear={() => clearBrandLogo(doc.brand)}
+            />
+            <LogoField
+              label="Institution logo"
+              image={doc.institutionLogo}
+              fallback="None uploaded"
+              testid="inst-logo-input"
+              onFile={setInstitutionLogo}
+              onClear={clearInstitutionLogo}
+            />
+          </details>
+
+          <details open>
             <summary>Template</summary>
             <TemplatePicker value={doc.template} onChange={(template) => patch({ template })} />
           </details>
@@ -209,67 +326,111 @@ export default function App() {
           </details>
 
           <details open>
-            <summary>Text</summary>
+            <summary>Poster text</summary>
             <label>
-              Headline
-              <textarea rows={2} maxLength={80} {...text('headline')} data-testid="headline" />
+              <span>Headline <small>(lines alternate between the two brand colours)</small></span>
+              <textarea rows={2} maxLength={80} {...text('headline')} onBlur={remember} data-testid="headline" />
             </label>
+            {savedHeadlines.length > 0 && (
+              <div className="saved">
+                <select
+                  id="saved-headlines"
+                  aria-label="Saved headlines"
+                  value=""
+                  onChange={(e) => e.target.value && patch({ text: { ...doc.text, headline: e.target.value } })}
+                  data-testid="saved-headlines"
+                >
+                  <option value="">Saved headlines ({savedHeadlines.length})…</option>
+                  {savedHeadlines.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="btn small" title="Forget the headline currently in the box" disabled={!savedHeadlines.includes(doc.text.headline.trim().replace(/\s+/g, ' '))} onClick={() => setSavedHeadlines((l) => forgetHeadline(l, doc.text.headline.trim().replace(/\s+/g, ' ')))} data-testid="forget-headline">
+                  Forget
+                </button>
+              </div>
+            )}
             <label>
-              Orange emphasis words
-              <input type="text" {...text('emphasis')} placeholder="e.g. Awareness" data-testid="emphasis" />
-            </label>
-            <label>
-              Institution name
+              <span>Institution name</span>
               <input type="text" maxLength={80} {...text('institution')} data-testid="institution" />
             </label>
             <label>
-              Location
+              <span>Location</span>
               <input type="text" maxLength={60} {...text('location')} data-testid="location" />
             </label>
             <label>
-              Audience or date <small>(optional)</small>
-              <input type="text" maxLength={40} {...text('detail')} placeholder="e.g. Grade 10 · 12 Oct 2026" data-testid="detail" />
+              <span>Audience <small>(optional)</small></span>
+              <input type="text" maxLength={40} {...text('audience')} placeholder="e.g. Grade 10" data-testid="audience" />
             </label>
+            <div className="two">
+              <label>
+                <span>Date</span>
+                <input type="date" value={doc.text.date} onChange={(e) => patch({ text: { ...doc.text, date: e.target.value } })} data-testid="date" />
+              </label>
+              <label>
+                <span>Students <small>(optional)</small></span>
+                <input type="number" inputMode="numeric" min={0} max={100000} value={doc.text.students} onChange={(e) => patch({ text: { ...doc.text, students: e.target.value.replace(/[^\d]/g, '').slice(0, 6) } })} placeholder="e.g. 120" data-testid="students" />
+              </label>
+            </div>
+            <div className="inline">
+              <label className="check">
+                <input type="checkbox" checked={doc.text.showDate} onChange={(e) => patch({ text: { ...doc.text, showDate: e.target.checked } })} data-testid="show-date" /> Show date on poster
+              </label>
+              <button type="button" className="btn small" onClick={() => patch({ text: { ...doc.text, date: todayISO() } })} data-testid="date-today">
+                Today
+              </button>
+            </div>
           </details>
 
           <details open>
-            <summary>Logos</summary>
-            <LogoField
-              label="Leaders Desk logo"
-              image={doc.leadersDeskLogo}
-              fallback="Using placeholder wordmark"
-              testid="ld-logo-input"
-              onFile={(f) => setLogo('leadersDeskLogo', f)}
-              onClear={() => clearLogo('leadersDeskLogo')}
-            />
-            <LogoField
-              label="Institution logo"
-              image={doc.institutionLogo}
-              fallback="None uploaded"
-              testid="inst-logo-input"
-              onFile={(f) => setLogo('institutionLogo', f)}
-              onClear={() => clearLogo('institutionLogo')}
-            />
+            <summary>Program description</summary>
+            <label>
+              <span>Start from a template</span>
+              <select
+                value=""
+                onChange={(e) => {
+                  const p = DESCRIPTION_PRESETS[+e.target.value];
+                  if (p) patch({ text: { ...doc.text, description: p.text } });
+                }}
+                data-testid="description-preset"
+              >
+                <option value="">Choose a description…</option>
+                {DESCRIPTION_PRESETS.map((p, i) => (
+                  <option key={p.label} value={i}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Description <small>(used in the share message)</small></span>
+              <textarea rows={4} maxLength={400} value={doc.text.description} onChange={(e) => patch({ text: { ...doc.text, description: e.target.value } })} data-testid="description" />
+            </label>
+            <p className="note">
+              Placeholders <code>{'{institution}'}</code> <code>{'{location}'}</code> <code>{'{date}'}</code> <code>{'{students}'}</code> <code>{'{audience}'}</code> are filled in from the fields above.
+            </p>
           </details>
 
           <details>
-            <summary>Brand &amp; background</summary>
+            <summary>Colours &amp; background</summary>
             <div className="colors">
               <label>
-                Navy <input type="color" {...color('navy')} data-testid="color-navy" />
+                <span>Primary</span> <input type="color" {...color('navy')} data-testid="color-navy" />
               </label>
               <label>
-                Orange <input type="color" {...color('orange')} data-testid="color-orange" />
+                <span>Accent</span> <input type="color" {...color('orange')} data-testid="color-orange" />
               </label>
               <label>
-                White <input type="color" {...color('white')} data-testid="color-white" />
+                <span>Background</span> <input type="color" {...color('white')} data-testid="color-white" />
               </label>
-              <button type="button" className="btn small" onClick={() => patch({ colors: initial.colors })}>
+              <button type="button" className="btn small" onClick={() => patch({ colors: { ...getBrand(doc.brand).colors } })}>
                 Reset
               </button>
             </div>
             <label>
-              Background pattern <output>{doc.patternVisibility}%</output>
+              <span>Background pattern <output>{doc.patternVisibility}%</output></span>
               <input type="range" min={0} max={100} value={doc.patternVisibility} onChange={(e) => patch({ patternVisibility: +e.target.value })} data-testid="pattern" />
             </label>
           </details>
@@ -277,7 +438,7 @@ export default function App() {
           <details open>
             <summary>Export</summary>
             <label>
-              Size
+              <span>Size</span>
               <select value={presetId} onChange={(e) => setPresetId(e.target.value)} data-testid="preset">
                 {EXPORT_PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -287,8 +448,36 @@ export default function App() {
               </select>
             </label>
             <button type="button" className="btn primary wide" onClick={doExport} disabled={busy} data-testid="export">
-              {busy ? 'Exporting…' : `Download PNG (${preset.width}×${preset.height})`}
+              {busy ? 'Working…' : `Download PNG (${preset.width}×${preset.height})`}
             </button>
+          </details>
+
+          <details open>
+            <summary>Share on WhatsApp</summary>
+            <label>
+              <span>Message <small>(updates from your fields; edit freely)</small></span>
+              <textarea rows={7} value={message} onChange={(e) => setMessageOverride(e.target.value)} data-testid="message" />
+            </label>
+            <div className="inline">
+              <button type="button" className="btn small" onClick={doCopy} data-testid="copy-message">
+                Copy message
+              </button>
+              {messageOverride !== null && (
+                <button type="button" className="btn small" onClick={() => setMessageOverride(null)} data-testid="reset-message">
+                  Reset to auto
+                </button>
+              )}
+            </div>
+            <label className="check">
+              <input type="checkbox" checked={attachOriginals} onChange={(e) => setAttachOriginals(e.target.checked)} data-testid="attach-originals" /> Also attach the original photos
+            </label>
+            <button type="button" className="btn wa wide" onClick={doShare} disabled={busy} data-testid="share">
+              Share poster + message
+            </button>
+            <a className="wa-link" href={whatsappLink(message)} target="_blank" rel="noopener noreferrer" data-testid="wa-link">
+              Open WhatsApp with the message only
+            </a>
+            <p className="note">On a phone this opens the share sheet with the poster and message together. Elsewhere it copies the message and saves the poster so you can attach it.</p>
           </details>
         </aside>
       </main>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { cropSourceRect, panCrop } from './crop';
 import { TEMPLATES } from './layouts';
-import { emphasisSet, fitText, isEmphasised } from './text';
-import { DESIGN_H, DESIGN_W, type Rect } from './types';
+import { BRANDS } from './brands';
+import { buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, studentsLabel, todayISO } from './format';
+import { fitText } from './text';
+import { DESIGN_H, DESIGN_W, type PosterDoc, type PosterText, type Rect } from './types';
 
 const inside = (r: Rect) => r.x >= 0 && r.y >= 0 && r.x + r.w <= DESIGN_W + 0.01 && r.y + r.h <= DESIGN_H + 0.01 && r.w > 0 && r.h > 0;
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.w - 0.01 && b.x < a.x + a.w - 0.01 && a.y < b.y + b.h - 0.01 && b.y < a.y + a.h - 0.01;
@@ -64,9 +66,54 @@ describe('headline fitting', () => {
     const r = fitText('A VERY LONG HEADLINE ABOUT AN EXTENDED CAREER GUIDANCE AND AWARENESS PROGRAMME FOR GRADE TEN', { maxWidth: 968, maxHeight: 200, maxLines: 3, maxSize: 104, minSize: 44, lineHeight: 1, measureAt });
     expect(r.height).toBeLessThanOrEqual(200);
   });
-  it('matches emphasis words ignoring case and punctuation', () => {
-    const s = emphasisSet('awareness, program!');
-    expect(isEmphasised('AWARENESS', s)).toBe(true);
-    expect(isEmphasised('Career', s)).toBe(false);
+});
+
+const text: PosterText = {
+  headline: 'Career Awareness Program',
+  institution: 'St. Mary’s School',
+  location: 'Chennai',
+  audience: 'Grade 10',
+  date: '2026-10-12',
+  showDate: true,
+  students: '120',
+  description: 'A session at {institution} for {students} ({audience}) on {date} in {location}.',
+};
+const doc = { text, brand: 'desk' } as unknown as PosterDoc;
+
+describe('dates, students and message', () => {
+  it('todayISO uses local time and zero-pads', () => {
+    expect(todayISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+  });
+  it('formats dates and rejects junk', () => {
+    expect(formatDate('2026-10-12')).toBe('12 Oct 2026');
+    expect(formatDate('')).toBe('');
+    expect(formatDate('2026-13-45x')).toBe('');
+  });
+  it('labels student counts', () => {
+    expect(studentsLabel('120')).toBe('120 students');
+    expect(studentsLabel('1')).toBe('1 student');
+    expect(studentsLabel('0')).toBe('');
+    expect(studentsLabel('')).toBe('');
+  });
+  it('footer detail lines drop empty fields', () => {
+    expect(detailLines(text)).toEqual(['12 Oct 2026', 'Grade 10 · 120 students']);
+    expect(detailLines({ ...text, showDate: false, audience: '', students: '' })).toEqual([]);
+  });
+  it('fills placeholders, with sensible fallbacks', () => {
+    expect(fillPlaceholders('{institution} / {students} / {nope}', { ...text, students: '' })).toBe('St. Mary’s School / students / {nope}');
+  });
+  it('builds a WhatsApp message with the brand sign-off', () => {
+    const m = buildMessage(doc);
+    expect(m).toContain('*Career Awareness Program*');
+    expect(m).toContain('12 Oct 2026 · 120 students · Grade 10');
+    expect(m).toContain('A session at St. Mary’s School for 120 students (Grade 10) on 12 Oct 2026 in Chennai.');
+    expect(m.endsWith('– Leaders Desk')).toBe(true);
+    expect(buildMessage({ ...doc, brand: 'foundation' } as PosterDoc).endsWith('– Leaders Foundation')).toBe(true);
+  });
+  it('every description preset only uses known placeholders', () => {
+    for (const p of DESCRIPTION_PRESETS) expect(fillPlaceholders(p.text, text)).not.toMatch(/\{\w+\}/);
+  });
+  it('brands have distinct palettes', () => {
+    expect(new Set(BRANDS.map((b) => b.colors.navy)).size).toBe(BRANDS.length);
   });
 });
