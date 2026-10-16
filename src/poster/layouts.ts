@@ -49,11 +49,11 @@ function column(box: Rect, n: number): Rect[] {
   return Array.from({ length: n }, (_, i) => rect(box.x, box.y + i * (h + GAP), box.w, h));
 }
 
-const HEADER_Y = 42;
-const HEADER_H = 100;
+const HEADER_Y = 52;
+const HEADER_H = 60;
 const logoBoxes = (y = HEADER_Y, h = HEADER_H) => ({
-  leadersDeskLogo: rect(MARGIN, y, 300, h),
-  institutionLogo: rect(DESIGN_W - MARGIN - 220, y, 220, h),
+  leadersDeskLogo: rect(MARGIN, y, 200, h),
+  institutionLogo: rect(DESIGN_W - MARGIN - 160, y, 160, h),
 });
 
 /** A. Hero Editorial: headline on top, wide hero, one row of supporting photos, compact footer. */
@@ -116,7 +116,7 @@ function galleryRows(n: number): number[] {
 function eventHighlights(supports: number, hasDesc: boolean): Geometry {
   const M = 48;
   const W = DESIGN_W - M * 2;
-  const card = rect(M, 40, W, 108);
+  const card = rect(M, 40, W, 84);
   const top = hasDesc ? 444 : 402;
   const bottom = 1224;
   const rows = galleryRows(supports);
@@ -129,17 +129,17 @@ function eventHighlights(supports: number, hasDesc: boolean): Geometry {
     rows.forEach((n, i) => rest.push(...row(cells[i], n)));
   }
   return {
-    leadersDeskLogo: rect(card.x + 28, card.y + 6, 300, card.h - 12),
-    institutionLogo: rect(card.x + card.w - 28 - 220, card.y + 6, 220, card.h - 12),
-    headerCard: { ...card, radius: 26 },
-    headline: { ...rect(M, 184, W, hasDesc ? 164 : 206), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
+    leadersDeskLogo: rect(card.x + 26, card.y + 14, 200, card.h - 28),
+    institutionLogo: rect(card.x + card.w - 26 - 160, card.y + 14, 160, card.h - 28),
+    headerCard: { ...card, radius: 22 },
+    headline: { ...rect(M, 168, W, hasDesc ? 180 : 222), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
     description: { ...rect(M, 356, W, 66), tone: 'dark' },
     slots: [hero, ...rest],
     radius: 22,
     footer: { rect: rect(M, 1246, W, 72), variant: 'band' },
     navyBands: [rect(0, 0, DESIGN_W, DESIGN_H)],
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'dark' },
-    accent: rect(M, 166, 64, 6),
+    accent: rect(M, 150, 64, 6),
   };
 }
 
