@@ -100,6 +100,12 @@ try {
     await T('photo-input').setInputFiles(fx('tiny.jpg'));
     await page.waitForSelector('.notice.warn');
     assert.equal((await names()).length, 4);
+    assert.equal(await page.locator('[data-testid=photo-item]').nth(3).getByTestId('quality-badge').count(), 0); // fine as a small side photo
+    await page.locator('[data-testid=photo-item]').nth(3).getByTestId('make-hero').click(); // but too small for the big hero slot
+    assert.equal(await page.locator('[data-testid=photo-item]').nth(3).getByTestId('quality-badge').textContent(), 'LOW RES');
+    assert.equal(await page.locator('[data-testid=photo-item]').nth(0).getByTestId('quality-badge').count(), 0); // the 4000px photo is fine
+    await page.locator('[data-testid=photo-item]').nth(3).locator('.thumbbtn').click();
+    assert.ok((await T('quality-note').textContent()).includes('WhatsApp'));
     await page.locator('[data-testid=photo-item]').nth(3).getByTestId('remove-photo').click();
     assert.equal((await names()).length, 3);
     await dismissAll();

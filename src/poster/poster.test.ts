@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cropSourceRect, panCrop } from './crop';
 import { TEMPLATES } from './layouts';
+import { photoQuality } from './render';
 import { BRANDS } from './brands';
 import { posterFilename, buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
 import { fitText } from './text';
@@ -148,5 +149,22 @@ describe('dates, students and message', () => {
   });
   it('brands have distinct palettes', () => {
     expect(new Set(BRANDS.map((b) => b.colors.navy)).size).toBe(BRANDS.length);
+  });
+});
+
+describe('photo resolution check', () => {
+  const photo = (id: string, w: number, h: number) => ({ id, image: { width: w, height: h } as never, zoom: 1, fx: 0.5, fy: 0.4 });
+  const base = { template: 'photo-story', text: { ...text, showDescription: false }, photos: [photo('a', 4000, 3000), photo('b', 320, 240)], heroId: 'a' } as unknown as PosterDoc;
+  it('flags small photos for the slot they fill, not photos in general', () => {
+    const q = photoQuality(base);
+    expect(q.a.level).toBe('good');
+    expect(q.b.level).toBe('low');
+    expect(q.b.needW).toBeGreaterThan(q.b.haveW);
+  });
+  it('zooming in lowers the effective resolution', () => {
+    const zoomed = { ...base, photos: [photo('a', 1500, 1000), photo('b', 4000, 3000)] } as unknown as PosterDoc;
+    const before = photoQuality(zoomed).a.haveW;
+    zoomed.photos[0] = { ...zoomed.photos[0], zoom: 3 };
+    expect(photoQuality(zoomed).a.haveW).toBeLessThan(before);
   });
 });

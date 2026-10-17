@@ -56,6 +56,66 @@ function drawWordmark(ctx: Ctx, box: Rect, parts: [string, string], navy: string
   ctx.fillText(parts[1], box.x + ctx.measureText(parts[0]).width, cy);
 }
 
+const SHARPEN_AMOUNT = 0.45;
+const enlargedCache = new Map<string, HTMLCanvasElement>();
+
+function makeCanvas(w: number, h: number) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  return c;
+}
+
+/** Gentle unsharp mask (3x3 gaussian), applied only after enlarging so soft upscales regain some edge definition. */
+function sharpen(c: HTMLCanvasElement, amount: number) {
+  const x = c.getContext('2d');
+  if (!x) return;
+  const { width: w, height: h } = c;
+  const img = x.getImageData(0, 0, w, h);
+  const d = img.data;
+  const src = new Uint8ClampedArray(d);
+  for (let y = 1; y < h - 1; y++) {
+    for (let px = 1; px < w - 1; px++) {
+      const i = (y * w + px) * 4;
+      for (let ch = 0; ch < 3; ch++) {
+        const k = i + ch;
+        const blur =
+          (src[k - w * 4 - 4] + 2 * src[k - w * 4] + src[k - w * 4 + 4] + 2 * src[k - 4] + 4 * src[k] + 2 * src[k + 4] + src[k + w * 4 - 4] + 2 * src[k + w * 4] + src[k + w * 4 + 4]) / 16;
+        d[k] = src[k] + amount * (src[k] - blur);
+      }
+    }
+  }
+  x.putImageData(img, 0, 0);
+}
+
+/**
+ * Enlarges the cropped region to the exact target pixel size in gentle 1.5x steps, which stays much
+ * smoother than one big jump, then sharpens lightly. Results are cached per crop and size.
+ */
+function enlargedCrop(image: LoadedImage, src: Rect, dw: number, dh: number): HTMLCanvasElement {
+  const key = `${image.url}|${src.x.toFixed(1)}|${src.y.toFixed(1)}|${src.w.toFixed(1)}|${dw}x${dh}`;
+  const hit = enlargedCache.get(key);
+  if (hit) return hit;
+  let cur = makeCanvas(src.w, src.h);
+  const c0 = cur.getContext('2d')!;
+  c0.imageSmoothingQuality = 'high';
+  c0.drawImage(image.source, src.x, src.y, src.w, src.h, 0, 0, cur.width, cur.height);
+  while (cur.width < dw) {
+    const nw = Math.min(dw, Math.round(cur.width * 1.5));
+    const last = nw >= dw;
+    const next = makeCanvas(nw, last ? dh : cur.height * (nw / cur.width));
+    const nx = next.getContext('2d')!;
+    nx.imageSmoothingEnabled = true;
+    nx.imageSmoothingQuality = 'high';
+    nx.drawImage(cur, 0, 0, next.width, next.height);
+    cur = next;
+  }
+  sharpen(cur, SHARPEN_AMOUNT);
+  if (enlargedCache.size >= 16) enlargedCache.delete(enlargedCache.keys().next().value as string);
+  enlargedCache.set(key, cur);
+  return cur;
+}
+
 function drawPhoto(ctx: Ctx, photo: ReturnType<typeof orderedPhotos>[number], r: Rect, radius: number) {
   const src = cropSourceRect({
     imageW: photo.image.width,
@@ -71,8 +131,39 @@ function drawPhoto(ctx: Ctx, photo: ReturnType<typeof orderedPhotos>[number], r:
   ctx.clip();
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(photo.image.source, src.x, src.y, src.w, src.h, r.x, r.y, r.w, r.h);
+  const scale = ctx.getTransform().a || 1;
+  const dw = Math.round(r.w * scale);
+  const dh = Math.round(r.h * scale);
+  if (dw / src.w > 1.15) {
+    ctx.drawImage(enlargedCrop(photo.image, src, dw, dh), r.x, r.y, r.w, r.h);
+  } else {
+    ctx.drawImage(photo.image.source, src.x, src.y, src.w, src.h, r.x, r.y, r.w, r.h);
+  }
   ctx.restore();
+}
+
+export type QualityLevel = 'good' | 'soft' | 'low';
+
+export interface PhotoQuality {
+  level: QualityLevel;
+  /** Pixels of the original that end up across the frame. */
+  haveW: number;
+  /** Pixels across the frame needed for a sharp 1080-wide export. */
+  needW: number;
+}
+
+/** How well each photo's resolution covers the spot it fills at the standard 1080×1350 export. */
+export function photoQuality(doc: PosterDoc): Record<string, PhotoQuality> {
+  const g = getGeometry(doc);
+  const out: Record<string, PhotoQuality> = {};
+  orderedPhotos(doc).forEach((p, i) => {
+    const slot = g.slots[i];
+    if (!slot) return;
+    const src = cropSourceRect({ imageW: p.image.width, imageH: p.image.height, frameW: slot.w, frameH: slot.h, zoom: p.zoom, fx: p.fx, fy: p.fy });
+    const ratio = src.w / slot.w;
+    out[p.id] = { level: ratio >= 0.9 ? 'good' : ratio >= 0.55 ? 'soft' : 'low', haveW: Math.round(src.w), needW: Math.round(slot.w) };
+  });
+  return out;
 }
 
 function emptySlot(ctx: Ctx, r: Rect, radius: number, label: string, dark: boolean) {

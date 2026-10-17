@@ -127,3 +127,9 @@ textarea[data-testid=message] { font-size: 13px; line-height: 1.45; }
 
 /* Example text in empty fields is faded so it can never be mistaken for a real value. */
 input::placeholder, textarea::placeholder { color: #8d9bb0; opacity: 0.55; font-weight: 400; }
+
+.thumbbtn b.q { position: absolute; left: 0; right: 0; top: 0; font-size: 8.5px; font-weight: 800; text-align: center; letter-spacing: .05em; color: #fff; padding: 1px 0; }
+.thumbbtn b.q.low { background: #c62828; }
+.thumbbtn b.q.soft { background: #b36b00; }
+.qnote { font-size: 11.5px; line-height: 1.45; margin: 4px 0 10px; padding: 8px 10px; border-radius: 8px; background: #fff4e5; color: #6b4300; }
+.qnote.low { background: #fdecea; color: #7a1c1c; }

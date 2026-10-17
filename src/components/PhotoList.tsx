@@ -2,11 +2,13 @@ import { useRef, useState } from 'react';
 import { MAX_PHOTOS } from '../poster/layouts';
 import { MAX_ZOOM, MIN_ZOOM } from '../poster/crop';
 import type { Photo } from '../poster/types';
+import type { PhotoQuality } from '../poster/render';
 
 interface Props {
   photos: Photo[];
   heroId: string | null;
   selectedId: string | null;
+  quality: Record<string, PhotoQuality>;
   onAdd: (files: File[]) => void;
   onSelect: (id: string) => void;
   onHero: (id: string) => void;
@@ -85,6 +87,9 @@ export default function PhotoList(p: Props) {
                 <button type="button" className="thumbbtn" onClick={() => p.onSelect(ph.id)} aria-label={`Select ${ph.image.name}`}>
                   <img src={ph.image.url} alt="" draggable={false} />
                   {hero && <em>HERO</em>}
+                  {p.quality[ph.id]?.level !== undefined && p.quality[ph.id].level !== 'good' && (
+                    <b className={`q ${p.quality[ph.id].level}`} data-testid="quality-badge">{p.quality[ph.id].level === 'low' ? 'LOW RES' : 'SOFT'}</b>
+                  )}
                 </button>
                 <span className="name" title={ph.image.name}>
                   {ph.image.name}
@@ -124,6 +129,11 @@ export default function PhotoList(p: Props) {
             Vertical
             <input type="range" min={0} max={1} step={0.005} value={sel.fy} onChange={(e) => p.onUpdate(sel.id, { fy: +e.target.value })} data-testid="pan-y" />
           </label>
+          {p.quality[sel.id] && p.quality[sel.id].level !== 'good' && (
+            <p className={`qnote ${p.quality[sel.id].level}`} data-testid="quality-note">
+              {p.quality[sel.id].level === 'low' ? 'Too small for this spot.' : 'Slightly small for this spot.'} This photo gives {p.quality[sel.id].haveW}px across a space that needs about {p.quality[sel.id].needW}px, so it will look soft. Use the original from the camera, Drive or Google Photos (photos forwarded on WhatsApp are shrunk), or lower the zoom.
+            </p>
+          )}
           <button type="button" className="btn small" onClick={() => p.onUpdate(sel.id, { zoom: 1, fx: 0.5, fy: 0.4 })}>
             Reset crop
           </button>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PhotoList from './components/PhotoList';
 import PosterPreview from './components/PosterPreview';
 import TemplatePicker from './components/TemplatePicker';
+import { photoQuality } from './poster/render';
 import { disposeImage, loadImageFile, UploadError } from './poster/images';
 import { downloadBlob, EXPORT_PRESETS, exportPoster } from './poster/export';
 import { MAX_PHOTOS } from './poster/layouts';
@@ -237,6 +238,7 @@ export default function App() {
     notify(ok ? 'ok' : 'error', ok ? 'Message copied. Paste it into WhatsApp.' : 'Couldn’t copy automatically. Select the message and copy it by hand.');
   };
 
+  const quality = useMemo(() => photoQuality(doc), [doc]);
   const mobile = useMemo(() => isMobileDevice(), []);
 
   const doShare = async () => {
@@ -352,6 +354,7 @@ export default function App() {
               photos={doc.photos}
               heroId={doc.heroId}
               selectedId={selectedId}
+              quality={quality}
               onAdd={addPhotos}
               onSelect={setSelectedId}
               onHero={(id) => patch({ heroId: id })}
