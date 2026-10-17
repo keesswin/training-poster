@@ -30,18 +30,38 @@ export default function PosterPreview({ doc, selectedId, fontsTick, onSelect, on
     return () => ro.disconnect();
   }, []);
 
+  // Pinch-zoom level of the page (where the browser reports it), so a zoomed-in preview is redrawn sharper.
+  const [pageZoom, setPageZoom] = useState(() => window.visualViewport?.scale ?? 1);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let t = 0;
+    const onResize = () => {
+      clearTimeout(t);
+      t = window.setTimeout(() => setPageZoom(Math.round(vv.scale * 4) / 4), 150);
+    };
+    vv.addEventListener('resize', onResize);
+    return () => {
+      clearTimeout(t);
+      vv.removeEventListener('resize', onResize);
+    };
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !cssW) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const scale = (cssW * dpr) / DESIGN_W;
+    // Draw well above screen resolution (2x, more when pinch-zoomed), up to the 2160px export size,
+    // so zooming into the preview on a phone shows real photo detail, not enlarged screen pixels.
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const targetW = Math.min(2160, Math.max(1080, cssW * dpr * Math.max(2, pageZoom)));
+    const scale = targetW / DESIGN_W;
     canvas.width = Math.round(DESIGN_W * scale);
     canvas.height = Math.round(DESIGN_H * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const id = requestAnimationFrame(() => renderPoster(ctx, withSampleText(doc), scale, { placeholders: true }));
     return () => cancelAnimationFrame(id);
-  }, [doc, cssW, fontsTick]);
+  }, [doc, cssW, fontsTick, pageZoom]);
 
   const geo = getGeometry(doc);
   const photos = orderedPhotos(doc);

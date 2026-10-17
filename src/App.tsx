@@ -53,6 +53,8 @@ export default function App() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [presetId, setPresetId] = useState(EXPORT_PRESETS[0].id);
   const [busy, setBusy] = useState(false);
+  const [fullView, setFullView] = useState<{ url: string; w: number; h: number } | null>(null);
+  const [actualPixels, setActualPixels] = useState(false);
   const [fontsTick, setFontsTick] = useState(0);
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -240,6 +242,25 @@ export default function App() {
 
   const exportPreset = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
   const quality = useMemo(() => photoQuality(doc, exportPreset.width / 1080), [doc, exportPreset.width]);
+  /** Renders the real export and shows it full screen, so quality can be judged on the actual file. */
+  const openFullView = async () => {
+    setBusy(true);
+    try {
+      await document.fonts.ready;
+      const blob = await exportPoster(docRef.current, exportPreset);
+      setActualPixels(false);
+      setFullView({ url: URL.createObjectURL(blob), w: exportPreset.width, h: exportPreset.height });
+    } catch (e) {
+      notify('error', `Couldn’t build the full-size view: ${e instanceof Error ? e.message : 'unknown error'}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const closeFullView = () => {
+    if (fullView) URL.revokeObjectURL(fullView.url);
+    setFullView(null);
+  };
+
   const mobile = useMemo(() => isMobileDevice(), []);
 
   const doShare = async () => {
@@ -310,9 +331,33 @@ export default function App() {
         ))}
       </div>
 
+      {fullView && (
+        <div className="fullview" role="dialog" aria-modal="true" aria-label="Full-size poster" data-testid="full-view-dialog">
+          <div className="fullview-bar">
+            <span>
+              Exported file · {fullView.w} × {fullView.h}px · pinch or tap to zoom
+            </span>
+            <button type="button" className="btn small" onClick={() => setActualPixels((v) => !v)} data-testid="full-view-zoom">
+              {actualPixels ? 'Fit to screen' : 'Actual pixels'}
+            </button>
+            <button type="button" className="btn small" onClick={closeFullView} data-testid="full-view-close">
+              Close
+            </button>
+          </div>
+          <div className="fullview-scroll">
+            <img src={fullView.url} alt="Full-size poster" className={actualPixels ? 'actual' : ''} onClick={() => setActualPixels((v) => !v)} data-testid="full-view-img" />
+          </div>
+        </div>
+      )}
+
       <main className="layout">
         <section className="stage">
-          <PosterPreview doc={doc} selectedId={selectedId} fontsTick={fontsTick} onSelect={setSelectedId} onCrop={onCrop} />
+          <div className="stage-col">
+            <PosterPreview doc={doc} selectedId={selectedId} fontsTick={fontsTick} onSelect={setSelectedId} onCrop={onCrop} />
+            <button type="button" className="btn small fullsize-btn" onClick={openFullView} disabled={busy} data-testid="full-view">
+              View full size ({exportPreset.width} × {exportPreset.height}) to check photo quality
+            </button>
+          </div>
         </section>
 
         <aside className="panel">

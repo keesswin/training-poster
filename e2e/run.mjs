@@ -281,7 +281,7 @@ try {
 
   await step('phone: share sheet gets poster (+ originals) and caption, and the caption is also copied', async () => {
     const mctx = await browser.newContext({
-      viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, acceptDownloads: true,
+      viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, acceptDownloads: true,
       userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36',
       permissions: ['clipboard-read', 'clipboard-write'],
     });
@@ -312,6 +312,20 @@ try {
     sh = await mp.evaluate(() => window.__shared);
     assert.equal(sh.names.length, 3);
     assert.equal(sh.names[0], 'GHSS-KURUCHI-2026-10-16.png');
+    // the phone preview is drawn far above screen resolution, so pinch-zooming shows real detail
+    const cw = await mp.getByTestId('poster-canvas').evaluate((c) => c.width);
+    const cssw = await mp.getByTestId('poster-canvas').evaluate((c) => c.getBoundingClientRect().width);
+    assert.ok(cw >= Math.min(2160, cssw * 2 * 2) - 2, `preview canvas ${cw}px for ${cssw} css px`);
+    // full-size viewer shows the real exported file
+    await mp.getByTestId('full-view').click();
+    await mp.waitForSelector('[data-testid=full-view-img]');
+    await mp.waitForFunction(() => document.querySelector('[data-testid=full-view-img]').naturalWidth > 0);
+    assert.equal(await mp.getByTestId('full-view-img').evaluate((i) => i.naturalWidth), 2160);
+    await mp.getByTestId('full-view-zoom').click();
+    assert.ok(await mp.getByTestId('full-view-img').evaluate((i) => i.classList.contains('actual')));
+    await mp.screenshot({ path: join(out, '07-phone-fullview.png') });
+    await mp.getByTestId('full-view-close').click();
+    assert.equal(await mp.getByTestId('full-view-dialog').count(), 0);
     await mctx.close();
   });
 

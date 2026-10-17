@@ -133,3 +133,13 @@ input::placeholder, textarea::placeholder { color: #8d9bb0; opacity: 0.55; font-
 .thumbbtn b.q.soft { background: #b36b00; }
 .qnote { font-size: 11.5px; line-height: 1.45; margin: 4px 0 10px; padding: 8px 10px; border-radius: 8px; background: #fff4e5; color: #6b4300; }
 .qnote.low { background: #fdecea; color: #7a1c1c; }
+
+.stage-col { display: grid; gap: 10px; justify-items: center; width: 100%; }
+.fullsize-btn { max-width: 100%; }
+.fullview { position: fixed; inset: 0; z-index: 50; background: rgba(6, 18, 38, .94); display: flex; flex-direction: column; }
+.fullview-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: max(10px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); color: #fff; font-size: 13px; }
+.fullview-bar span { flex: 1; min-width: 160px; }
+.fullview-scroll { flex: 1; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 0 16px 24px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom; }
+.fullview-scroll img { max-width: 100%; max-height: calc(100vh - 90px); height: auto; cursor: zoom-in; background: #fff; }
+.fullview-scroll img.actual { max-width: none; max-height: none; cursor: zoom-out; }
+.fullview-bar .btn { color: var(--ink); }
