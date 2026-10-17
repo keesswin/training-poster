@@ -148,20 +148,21 @@ export interface PhotoQuality {
   level: QualityLevel;
   /** Pixels of the original that end up across the frame. */
   haveW: number;
-  /** Pixels across the frame needed for a sharp 1080-wide export. */
+  /** Pixels across the frame needed for a sharp export at the chosen size. */
   needW: number;
 }
 
-/** How well each photo's resolution covers the spot it fills at the standard 1080×1350 export. */
-export function photoQuality(doc: PosterDoc): Record<string, PhotoQuality> {
+/** How well each photo's resolution covers the spot it fills, at an export `exportScale`× the 1080 design size. */
+export function photoQuality(doc: PosterDoc, exportScale = 1): Record<string, PhotoQuality> {
   const g = getGeometry(doc);
   const out: Record<string, PhotoQuality> = {};
   orderedPhotos(doc).forEach((p, i) => {
     const slot = g.slots[i];
     if (!slot) return;
     const src = cropSourceRect({ imageW: p.image.width, imageH: p.image.height, frameW: slot.w, frameH: slot.h, zoom: p.zoom, fx: p.fx, fy: p.fy });
-    const ratio = src.w / slot.w;
-    out[p.id] = { level: ratio >= 0.9 ? 'good' : ratio >= 0.55 ? 'soft' : 'low', haveW: Math.round(src.w), needW: Math.round(slot.w) };
+    const need = slot.w * exportScale;
+    const ratio = src.w / need;
+    out[p.id] = { level: ratio >= 0.9 ? 'good' : ratio >= 0.55 ? 'soft' : 'low', haveW: Math.round(src.w), needW: Math.round(need) };
   });
   return out;
 }

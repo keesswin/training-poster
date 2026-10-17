@@ -48,8 +48,10 @@ describe('poster filename', () => {
     expect(posterFilename({ ...text, institution: '', date: '2026-01-05' })).toBe('POSTER-2026-01-05.png');
     expect(posterFilename({ ...text, institution: 'x'.repeat(100), date: '2026-01-05' }).length).toBeLessThan(70);
   });
-  it('marks larger exports', () => {
-    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 2160)).toBe('ABC-2026-01-05-2160PX.png');
+  it('the default high-quality size has no suffix; other sizes say their width', () => {
+    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' })).toBe('ABC-2026-01-05.png');
+    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 1080)).toBe('ABC-2026-01-05-1080PX.png');
+    expect(posterFilename({ ...text, institution: 'ABC', date: '2026-01-05' }, 3240)).toBe('ABC-2026-01-05-3240PX.png');
   });
 });
 
@@ -160,6 +162,12 @@ describe('photo resolution check', () => {
     expect(q.a.level).toBe('good');
     expect(q.b.level).toBe('low');
     expect(q.b.needW).toBeGreaterThan(q.b.haveW);
+  });
+  it('a bigger export needs more pixels from the same photo', () => {
+    const doc = { ...base, photos: [photo('a', 1500, 1125), photo('b', 4000, 3000)] } as unknown as PosterDoc;
+    expect(photoQuality(doc, 1).a.level).toBe('good');
+    expect(photoQuality(doc, 2).a.level).not.toBe('good');
+    expect(photoQuality(doc, 2).a.needW).toBe(2 * photoQuality(doc, 1).a.needW);
   });
   it('zooming in lowers the effective resolution', () => {
     const zoomed = { ...base, photos: [photo('a', 1500, 1000), photo('b', 4000, 3000)] } as unknown as PosterDoc;

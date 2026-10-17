@@ -13,9 +13,13 @@ export interface ExportPreset {
  * so any preset must share the 4:5 aspect. A different aspect ratio needs its own template geometry.
  */
 export const EXPORT_PRESETS: ExportPreset[] = [
-  { id: 'instagram-portrait', label: 'Instagram portrait · 1080 × 1350', width: 1080, height: 1350 },
-  { id: 'instagram-portrait-2x', label: 'Instagram portrait @2x · 2160 × 2700', width: 2160, height: 2700 },
+  // Default. Group photos need the extra pixels: at 1080 wide a face in a 20-person photo is only ~35px.
+  { id: 'hd', label: 'High quality · 2160 × 2700 (recommended)', width: 2160, height: 2700 },
+  { id: 'instagram-portrait', label: 'Instagram size · 1080 × 1350', width: 1080, height: 1350 },
+  { id: 'xl', label: 'Extra large · 3240 × 4050 (print, big screens)', width: 3240, height: 4050 },
 ];
+
+export const DEFAULT_EXPORT_WIDTH = EXPORT_PRESETS[0].width;
 
 export function presetScale(p: ExportPreset) {
   return p.width / DESIGN_W;

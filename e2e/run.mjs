@@ -100,7 +100,7 @@ try {
     await T('photo-input').setInputFiles(fx('tiny.jpg'));
     await page.waitForSelector('.notice.warn');
     assert.equal((await names()).length, 4);
-    assert.equal(await page.locator('[data-testid=photo-item]').nth(3).getByTestId('quality-badge').count(), 0); // fine as a small side photo
+    assert.equal(await page.locator('[data-testid=photo-item]').nth(3).getByTestId('quality-badge').count(), 1); // a 320px photo is too small even for a side slot at high quality
     await page.locator('[data-testid=photo-item]').nth(3).getByTestId('make-hero').click(); // but too small for the big hero slot
     assert.equal(await page.locator('[data-testid=photo-item]').nth(3).getByTestId('quality-badge').textContent(), 'LOW RES');
     assert.equal(await page.locator('[data-testid=photo-item]').nth(0).getByTestId('quality-badge').count(), 0); // the 4000px photo is fine
@@ -271,7 +271,7 @@ try {
     await dismissAll();
     assert.equal(await page.getByTestId('attach-originals').count(), 0); // desktop has no share sheet, so no originals option
     const f = await dl('share', 'share-fallback.png');
-    assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 });
+    assert.deepEqual(pngSize(f.buf), { w: 2160, h: 2700 }); // shares the high-quality default
     assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}\.png$/);
     await page.waitForSelector('.notice.ok');
     // the caption is on the clipboard even though the share dialog is skipped on desktop
@@ -354,7 +354,8 @@ try {
   });
 
   const templates = ['hero-editorial', 'photo-story', 'event-highlights'];
-  await step('all templates export exactly 1080×1350 PNGs with 6 photos', async () => {
+  await step('all templates export exactly 1080×1350 PNGs with 6 photos (Instagram size)', async () => {
+    await T('preset').selectOption('instagram-portrait');
     for (const t of templates) {
       await T('tpl-' + t).click();
       await settle();
@@ -362,15 +363,19 @@ try {
       const f = await dl('export', `export-${t}.png`);
       assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 }, t);
       assert.ok(f.buf.length > 100_000, 'png is not trivially small');
-      assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}\.png$/, f.name);
+      assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}-1080PX\.png$/, f.name);
       assert.ok((await page.locator('.notice.ok').count()) > 0);
     }
   });
 
-  await step('@2x preset exports 2160×2700', async () => {
-    await T('preset').selectOption('instagram-portrait-2x');
+  await step('high-quality default exports 2160×2700 and extra large exports 3240×4050', async () => {
+    await T('preset').selectOption('hd');
     const f = await dl('export-top', 'export-2x.png');
     assert.deepEqual(pngSize(f.buf), { w: 2160, h: 2700 });
+    assert.match(f.name, /^CHANGED-SCHOOL-\d{4}-\d{2}-\d{2}\.png$/);
+    await T('preset').selectOption('xl');
+    const x = await dl('export', 'export-3x.png');
+    assert.deepEqual(pngSize(x.buf), { w: 3240, h: 4050 });
     await T('preset').selectOption('instagram-portrait');
   });
 
@@ -390,8 +395,9 @@ try {
   await step('export without logo/photos still works', async () => {
     await page.reload();
     await T('poster-canvas').waitFor();
+    assert.equal(await T('preset').inputValue(), 'hd'); // high quality is the default
     const f = await dl('export', 'export-empty.png');
-    assert.deepEqual(pngSize(f.buf), { w: 1080, h: 1350 });
+    assert.deepEqual(pngSize(f.buf), { w: 2160, h: 2700 });
   });
 
   await step('mobile layout: no horizontal scroll, preview fits', async () => {

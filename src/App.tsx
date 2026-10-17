@@ -238,7 +238,8 @@ export default function App() {
     notify(ok ? 'ok' : 'error', ok ? 'Message copied. Paste it into WhatsApp.' : 'Couldn’t copy automatically. Select the message and copy it by hand.');
   };
 
-  const quality = useMemo(() => photoQuality(doc), [doc]);
+  const exportPreset = EXPORT_PRESETS.find((p) => p.id === presetId) ?? EXPORT_PRESETS[0];
+  const quality = useMemo(() => photoQuality(doc, exportPreset.width / 1080), [doc, exportPreset.width]);
   const mobile = useMemo(() => isMobileDevice(), []);
 
   const doShare = async () => {
@@ -250,7 +251,7 @@ export default function App() {
     try {
       await document.fonts.ready;
       const d = docRef.current;
-      const preset = EXPORT_PRESETS[0];
+      const preset = exportPreset;
       const blob = await exportPoster(d, preset);
       const filename = posterFilename(d.text, preset.width);
       if (mobile) {
@@ -486,6 +487,7 @@ export default function App() {
             <button type="button" className="btn primary wide" onClick={doExport} disabled={busy} data-testid="export">
               {busy ? 'Working…' : `Download PNG (${preset.width}×${preset.height})`}
             </button>
+            <p className="note">High quality keeps faces sharp when people zoom in. Instagram shrinks every post to 1080 wide, so either size works there.</p>
           </details>
 
           <details open>
@@ -515,6 +517,7 @@ export default function App() {
             <a className="wa-link" href={whatsappLink(message)} target="_blank" rel="noopener noreferrer" data-testid="wa-link">
               Open WhatsApp with the message only
             </a>
+            <p className="note">For full quality in WhatsApp, tap <b>HD</b> before sending, or send the poster as a <b>Document</b>.</p>
             <p className="note">
               {mobile
                 ? 'Opens the share sheet with the poster and message together. The message is also copied, in case WhatsApp leaves the caption out.'

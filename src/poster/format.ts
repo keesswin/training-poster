@@ -91,7 +91,8 @@ export function buildMessage(doc: PosterDoc): string {
 }
 
 /** "GHSS Kuruchi" + 2026-10-16 -> "GHSS-KURUCHI-2026-10-16.png". Falls back to "POSTER" without an institution. */
-export function posterFilename(t: PosterText, width = 1080): string {
+/** The default (2160) export carries no size suffix; other sizes add their width, e.g. -1080PX. */
+export function posterFilename(t: PosterText, width = 2160): string {
   const slug = t.institution
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -101,7 +102,7 @@ export function posterFilename(t: PosterText, width = 1080): string {
     .slice(0, 48)
     .replace(/-+$/g, '');
   const date = /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : todayISO();
-  return `${slug || 'POSTER'}-${date}${width === 1080 ? '' : `-${width}PX`}.png`;
+  return `${slug || 'POSTER'}-${date}${width === 2160 ? '' : `-${width}PX`}.png`;
 }
 
 /** Sample copy the live preview shows for empty fields. Never used for export. */
