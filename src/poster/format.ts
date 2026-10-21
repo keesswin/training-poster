@@ -63,8 +63,8 @@ export function posterDescription(t: PosterText): string {
 
 export function fillPlaceholders(text: string, t: PosterText) {
   const fallback: Record<string, string> = {
-    institution: t.institution.trim() || 'the school',
-    location: t.location.trim(),
+    institution: titleCase(t.institution) || 'the school',
+    location: titleCase(t.location),
     date: formatDate(t.date),
     students: studentsLabel(t.students) || 'students',
     audience: t.audience.trim() || 'students',
@@ -73,14 +73,48 @@ export function fillPlaceholders(text: string, t: PosterText) {
 }
 
 /** WhatsApp-ready caption (uses WhatsApp's *bold* syntax). */
+const SMALL_WORDS = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'from', 'in', 'into', 'of', 'on', 'or', 'the', 'to', 'with']);
+
+/**
+ * Title case for names and places: "the fort of patriotism, k.g chavadi" -> "The Fort of Patriotism, K.G Chavadi".
+ * Short all-capital words (GHSS, SAN, K.G) and words with inner capitals (McCarthy) are kept as typed.
+ */
+export function titleCase(input: string): string {
+  const words = input.trim().replace(/\s+/g, ' ').split(' ').filter(Boolean);
+  return words
+    .map((w, i) => {
+      const letters = w.replace(/[^\p{L}]/gu, '');
+      if (!letters) return w;
+      const allCaps = letters === letters.toUpperCase() && letters !== letters.toLowerCase();
+      if (allCaps && letters.length <= 4) return w; // acronym: GHSS, SAN, K.G
+      if (!allCaps && /\p{Lu}/u.test(letters.slice(1))) return w; // deliberate inner capital: McCarthy
+      const lower = w.toLowerCase();
+      const bare = lower.replace(/[^\p{L}]/gu, '');
+      const prev = i > 0 ? words[i - 1] : '';
+      if (i > 0 && SMALL_WORDS.has(bare) && !/[,:;.!?]$/.test(prev)) return lower;
+      return lower.replace(/(^|[-.(/])(\p{L})/gu, (_m, p: string, c: string) => p + c.toUpperCase());
+    })
+    .join(' ');
+}
+
+/** First letter upper case, the rest as typed (lower-cased first if it was typed in capitals). */
+export function capitalizeFirst(input: string): string {
+  const t = input.trim().replace(/\s+/g, ' ');
+  if (!t) return '';
+  const letters = t.replace(/[^\p{L}]/gu, '');
+  const base = letters.length > 3 && letters === letters.toUpperCase() ? t.toLowerCase() : t;
+  return base.replace(/\p{L}/u, (c) => c.toUpperCase());
+}
+
 export function buildMessage(doc: PosterDoc): string {
   const t = doc.text;
   const brand = getBrand(doc.brand);
-  const place = [t.institution.trim(), t.location.trim()].filter(Boolean).join(', ');
-  const facts = [t.showDate ? formatDate(t.date) : '', studentsLabel(t.students), t.audience.trim()].filter(Boolean).join(' · ');
+  const place = [titleCase(t.institution), titleCase(t.location)].filter(Boolean).join(', ');
+  const facts = [t.showDate ? formatDate(t.date) : '', studentsLabel(t.students), capitalizeFirst(t.audience)].filter(Boolean).join(' · ');
   const desc = sentenceCase(fillPlaceholders(t.description.trim(), t));
+  const headline = titleCase(t.headline);
   return [
-    t.headline.trim() && `*${t.headline.trim()}*`,
+    headline && `*${headline}*`,
     place,
     facts,
     desc && `\n${desc}`,

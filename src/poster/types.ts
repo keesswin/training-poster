@@ -65,6 +65,8 @@ export interface PosterDoc {
   fontSet: FontSetId;
   /** One uploaded logo per brand; the selected brand's logo is drawn top-left. */
   brandLogos: Record<BrandId, LoadedImage | null>;
+  /** White versions for dark templates (from src/assets/logos/*-white.*). Missing ones are generated from the normal logo. */
+  brandLogosWhite: Record<BrandId, LoadedImage | null>;
   institutionLogo: LoadedImage | null;
   /** Photos in user order. The hero is picked separately, supports keep list order. */
   photos: Photo[];

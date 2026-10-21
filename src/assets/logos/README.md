@@ -5,6 +5,11 @@ Drop the official logos here and they become the defaults for each brand (no upl
 - `leaders-desk.png`
 - `leaders-foundation.png`
 
+White versions for the dark Event Highlights template (optional; without them a white version is generated automatically from the normal logo):
+
+- `leaders-desk-white.png`
+- `leaders-foundation-white.png`
+
 `.png`, `.webp`, `.jpg` and `.svg` all work. Use the logo as supplied (transparent background is best). The file is drawn untouched at its own aspect ratio. A logo uploaded in the editor overrides the default on that browser.
 
 The hosted single-file build (`npm run build:hosted`) embeds these files, so rebuild after changing them.

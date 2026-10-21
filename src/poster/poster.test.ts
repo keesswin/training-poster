@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { cropSourceRect, panCrop } from './crop';
-import { TEMPLATES } from './layouts';
+import { reflow, TEMPLATES } from './layouts';
 import { photoQuality } from './render';
 import { BRANDS } from './brands';
-import { posterFilename, buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
+import { capitalizeFirst, titleCase, posterFilename, buildMessage, detailLines, DESCRIPTION_PRESETS, fillPlaceholders, formatDate, posterDescription, sentenceCase, studentsLabel, todayISO } from './format';
 import { fitText } from './text';
 import { DESIGN_H, DESIGN_W, type PosterDoc, type PosterText, type Rect } from './types';
 
@@ -21,7 +21,8 @@ describe('layouts', () => {
           for (const r of [g.headline, g.footer.rect, ...g.slots, ...(desc ? [g.description] : [])]) expect(overlap(g.headerCard, r)).toBe(false);
           for (const r of [g.leadersDeskLogo, g.institutionLogo]) expect(inside(r) && r.x >= g.headerCard.x && r.x + r.w <= g.headerCard.x + g.headerCard.w).toBe(true);
         }
-        const fixed = [g.leadersDeskLogo, g.institutionLogo, g.headline, g.footer.rect, ...(desc ? [g.description] : [])];
+        // centred templates draw both logos as one group inside a single box
+        const fixed = [g.leadersDeskLogo, ...(g.logoAlign === 'center' ? [] : [g.institutionLogo]), g.headline, g.footer.rect, ...(desc ? [g.description] : [])];
         for (const r of [...fixed, ...g.slots]) expect(inside(r)).toBe(true);
         // photos never collide with each other or with text / logo boxes
         const all = [...g.slots.map((r) => ({ r, k: 'photo' })), ...fixed.map((r) => ({ r, k: 'fixed' }))];
@@ -174,5 +175,50 @@ describe('photo resolution check', () => {
     const before = photoQuality(zoomed).a.haveW;
     zoomed.photos[0] = { ...zoomed.photos[0], zoom: 3 };
     expect(photoQuality(zoomed).a.haveW).toBeLessThan(before);
+  });
+});
+
+describe('message capitalisation', () => {
+  it('title-cases names and places but keeps acronyms', () => {
+    expect(titleCase('the fort of patriotism')).toBe('The Fort of Patriotism');
+    expect(titleCase('K.G chavadi coimbatore')).toBe('K.G Chavadi Coimbatore');
+    expect(titleCase('GHSS KURUCHI')).toBe('GHSS Kuruchi');
+    expect(titleCase('azad hind')).toBe('Azad Hind');
+    expect(titleCase('st. mary’s school')).toBe('St. Mary’s School');
+    expect(titleCase('SAN international college of arts and science')).toBe('SAN International College of Arts and Science');
+  });
+  it('capitalises the audience like a sentence', () => {
+    expect(capitalizeFirst('public and students')).toBe('Public and students');
+    expect(capitalizeFirst('GRADE 10 STUDENTS')).toBe('Grade 10 students');
+  });
+  it('builds the message the way the user expects', () => {
+    const m = buildMessage({
+      brand: 'foundation',
+      text: { ...text, headline: 'Azad hind', institution: 'The fort of patriotism', location: 'K.G chavadi coimbatore', audience: 'public and students', students: '181', date: '2026-10-21', description: 'jai hind foundation organised the programme. it was a success.' },
+    } as unknown as PosterDoc);
+    expect(m.split('\n').slice(0, 3)).toEqual(['*Azad Hind*', 'The Fort of Patriotism, K.G Chavadi Coimbatore', '21 Oct 2026 · 181 students · Public and students']);
+    expect(m).toContain('Jai hind foundation organised the programme. It was a success.');
+    expect(m.endsWith('– Leaders Foundation')).toBe(true);
+  });
+});
+
+describe('text reflow', () => {
+  it('a one-line headline pulls the description up and grows the hero (text above photos)', () => {
+    const g = TEMPLATES.find((t) => t.id === 'event-highlights')!.geometry(3, true);
+    const r = reflow(g, 102, 70);
+    expect(r.description.y).toBeLessThan(g.description.y);
+    expect(r.slots[0].y).toBeLessThan(g.slots[0].y);
+    expect(r.slots[0].y + r.slots[0].h).toBe(g.slots[0].y + g.slots[0].h); // bottom edge unchanged
+    expect(r.slots[0].y).toBeGreaterThan(r.description.y + 70); // never overlaps the text
+  });
+  it('photos stay put on templates with text below the photos', () => {
+    const g = TEMPLATES.find((t) => t.id === 'photo-story')!.geometry(3, true);
+    const r = reflow(g, 90, 70);
+    expect(r.slots).toEqual(g.slots);
+    expect(r.description.y).toBeLessThan(g.description.y);
+  });
+  it('a full-height headline changes nothing', () => {
+    const g = TEMPLATES.find((t) => t.id === 'hero-editorial')!.geometry(2, true);
+    expect(reflow(g, g.headline.h, g.description.h).slots).toEqual(g.slots);
   });
 });

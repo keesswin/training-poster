@@ -6,10 +6,12 @@ const CONTENT_W = DESIGN_W - MARGIN * 2;
 
 export type Tone = 'light' | 'dark';
 
+export type HeadlineBox = Rect & { maxLines: number; maxSize: number; minSize: number; tone: Tone };
+
 export interface Geometry {
   leadersDeskLogo: Rect;
   institutionLogo: Rect;
-  headline: Rect & { maxLines: number; maxSize: number; minSize: number; tone: Tone };
+  headline: HeadlineBox;
   /** slots[0] is always the hero; the rest are supporting photos in order. */
   slots: Rect[];
   radius: number;
@@ -20,8 +22,15 @@ export interface Geometry {
   pattern: { rect: Rect; tone: Tone };
   /** Optional small orange accent bar. */
   accent: Rect | null;
-  /** Rounded white card behind the logos (used on dark templates so any logo stays legible). */
+  /** Rounded white card behind the logos (no template uses one now; kept for custom templates). */
   headerCard: (Rect & { radius: number }) | null;
+  /** 'split' = brand logo left, institution right. 'center' = both centred as one group. */
+  logoAlign: 'split' | 'center';
+  /** 'dark' backgrounds use the white version of the brand logo. */
+  logoTone: Tone;
+  /** 'below-photos' templates keep photos fixed and let the text follow the headline; 'above-photos' templates
+   *  pull the photos up to sit right under the text, so short headlines never leave a gap. */
+  textFlow: 'above-photos' | 'below-photos';
   /** Where the program description goes (always present; only drawn when there is text). */
   description: Rect & { tone: Tone };
 }
@@ -75,6 +84,9 @@ function heroEditorial(supports: number, hasDesc: boolean): Geometry {
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'light' },
     accent: null,
     headerCard: null,
+    logoAlign: 'split',
+    logoTone: 'light',
+    textFlow: 'above-photos',
   };
 }
 
@@ -98,6 +110,9 @@ function photoStory(supports: number, hasDesc: boolean): Geometry {
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'light' },
     accent: rect(MARGIN, 944, 88, 8),
     headerCard: null,
+    logoAlign: 'split',
+    logoTone: 'light',
+    textFlow: 'below-photos',
   };
 }
 
@@ -109,15 +124,15 @@ function galleryRows(n: number): number[] {
 }
 
 /**
- * C. Event Highlights: a full navy canvas. A white header card carries both logos, the headline
- * sits large on the navy, then a rounded hero and an even gallery, with the school identity set
- * straight onto the navy at the bottom.
+ * C. Event Highlights: a full brand-colour canvas. The white brand logo (and the institution logo, if any)
+ * sits centred at the top, the headline is set large on the colour, then a rounded hero and an even gallery,
+ * with the school identity at the bottom.
  */
 function eventHighlights(supports: number, hasDesc: boolean): Geometry {
   const M = 48;
   const W = DESIGN_W - M * 2;
-  const card = rect(M, 40, W, 84);
-  const top = hasDesc ? 444 : 402;
+  const logoBox = rect(M, 40, W, 66);
+  const top = hasDesc ? 430 : 392;
   const bottom = 1224;
   const rows = galleryRows(supports);
   const galleryH = rows.length === 0 ? 0 : rows.length === 1 ? 300 : 320;
@@ -129,18 +144,38 @@ function eventHighlights(supports: number, hasDesc: boolean): Geometry {
     rows.forEach((n, i) => rest.push(...row(cells[i], n)));
   }
   return {
-    leadersDeskLogo: rect(card.x + 26, card.y + 14, 200, card.h - 28),
-    institutionLogo: rect(card.x + card.w - 26 - 160, card.y + 14, 160, card.h - 28),
-    headerCard: { ...card, radius: 22 },
-    headline: { ...rect(M, 168, W, hasDesc ? 180 : 222), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
-    description: { ...rect(M, 356, W, 66), tone: 'dark' },
+    leadersDeskLogo: logoBox,
+    institutionLogo: logoBox,
+    headerCard: null,
+    logoAlign: 'center',
+    logoTone: 'dark',
+    textFlow: 'above-photos',
+    headline: { ...rect(M, 160, W, hasDesc ? 176 : 214), maxLines: 3, maxSize: 100, minSize: 44, tone: 'dark' },
+    description: { ...rect(M, 346, W, 66), tone: 'dark' },
     slots: [hero, ...rest],
     radius: 22,
     footer: { rect: rect(M, 1246, W, 72), variant: 'band' },
     navyBands: [rect(0, 0, DESIGN_W, DESIGN_H)],
     pattern: { rect: rect(0, 0, DESIGN_W, DESIGN_H), tone: 'dark' },
-    accent: rect(M, 150, 64, 6),
+    accent: rect(M, 140, 64, 6),
   };
+}
+
+/**
+ * Moves the description up under the headline's real height and, for templates with text above the photos,
+ * pulls the hero photo up to sit under the text. `headlineH`/`descH` are measured heights (0 = none).
+ */
+export function reflow(g: Geometry, headlineH: number, descH: number): Geometry {
+  const TEXT_GAP = 14;
+  const PHOTO_GAP = 30;
+  const descY = g.headline.y + headlineH + TEXT_GAP;
+  const description = { ...g.description, y: Math.min(g.description.y, descY) };
+  if (g.textFlow !== 'above-photos') return { ...g, description };
+  const textBottom = descH > 0 ? description.y + descH : g.headline.y + headlineH;
+  const hero = g.slots[0];
+  const lift = hero.y - (textBottom + PHOTO_GAP);
+  if (lift <= 0) return { ...g, description };
+  return { ...g, description, slots: [{ ...hero, y: hero.y - lift, h: hero.h + lift }, ...g.slots.slice(1)] };
 }
 
 export const TEMPLATES: TemplateDef[] = [

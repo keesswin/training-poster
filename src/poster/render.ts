@@ -1,5 +1,5 @@
 import { cropSourceRect } from './crop';
-import { getTemplate, clampSupports, MARGIN, type Geometry, type Tone } from './layouts';
+import { getTemplate, clampSupports, MARGIN, reflow, type Geometry, type HeadlineBox, type Tone } from './layouts';
 import { getBrand } from './brands';
 import { css, getFontSet, type FontSet } from './fonts';
 import { detailLines, posterDescription } from './format';
@@ -16,8 +16,21 @@ export function orderedPhotos(doc: PosterDoc) {
   return [hero, ...doc.photos.filter((p) => p !== hero)];
 }
 
+let measureCtx: Ctx | null = null;
+function getMeasureCtx(): Ctx | null {
+  if (measureCtx) return measureCtx;
+  if (typeof document === 'undefined') return null;
+  measureCtx = document.createElement('canvas').getContext('2d');
+  return measureCtx;
+}
+
 export function getGeometry(doc: PosterDoc): Geometry {
-  return getTemplate(doc.template).geometry(clampSupports(doc.photos.length), posterDescription(doc.text) !== '');
+  const g = getTemplate(doc.template).geometry(clampSupports(doc.photos.length), posterDescription(doc.text) !== '');
+  const m = getMeasureCtx();
+  if (!m) return g;
+  const h = fitHeadline(m, doc, g.headline);
+  const d = fitDescription(m, doc, g.description);
+  return reflow(g, h ? h.height : 0, d ? d.height : 0);
 }
 
 function roundRectPath(ctx: Ctx, r: Rect, radius: number) {
@@ -54,6 +67,72 @@ function drawWordmark(ctx: Ctx, box: Rect, parts: [string, string], navy: string
   ctx.fillText(parts[0], box.x, cy);
   ctx.fillStyle = orange;
   ctx.fillText(parts[1], box.x + ctx.measureText(parts[0]).width, cy);
+}
+
+const whiteCache = new Map<string, LoadedImage>();
+
+/** A white silhouette of a flat logo (all visible pixels painted white), for dark backgrounds. */
+function whiteVersion(img: LoadedImage): LoadedImage {
+  const hit = whiteCache.get(img.url);
+  if (hit) return hit;
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const x = c.getContext('2d')!;
+  x.drawImage(img.source, 0, 0);
+  x.globalCompositeOperation = 'source-in';
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, c.width, c.height);
+  const out = { ...img, source: c };
+  whiteCache.set(img.url, out);
+  return out;
+}
+
+function containSize(img: LoadedImage, maxW: number, maxH: number) {
+  const ar = img.width / img.height;
+  let w = maxW;
+  let h = w / ar;
+  if (h > maxH) {
+    h = maxH;
+    w = h * ar;
+  }
+  return { w, h };
+}
+
+/** Brand logo (white) centred, with the institution logo on a small white tile beside it when there is one. */
+function drawCenteredLogos(ctx: Ctx, doc: PosterDoc, box: Rect) {
+  const normal = doc.brandLogos[doc.brand];
+  const brand = doc.brandLogosWhite[doc.brand] ?? (normal ? whiteVersion(normal) : null);
+  const inst = doc.institutionLogo;
+  const bSize = brand ? containSize(brand, 260, box.h) : { w: 0, h: 0 };
+  const TILE_PAD = 8;
+  const iSize = inst ? containSize(inst, 150, box.h - TILE_PAD * 2) : { w: 0, h: 0 };
+  const tileW = inst ? iSize.w + TILE_PAD * 2 : 0;
+  const GAP = 26;
+  const fs = getFontSet(doc.fontSet);
+  let wordW = 0;
+  if (!brand) {
+    ctx.font = css(fs.display, 34);
+    wordW = ctx.measureText(getBrand(doc.brand).wordmark.join('')).width;
+  }
+  const brandW = brand ? bSize.w : wordW;
+  const total = brandW + (inst ? GAP * 2 + 2 + tileW : 0);
+  let x = DESIGN_W / 2 - total / 2;
+  const cy = box.y + box.h / 2;
+  if (brand) ctx.drawImage(brand.source, x, cy - bSize.h / 2, bSize.w, bSize.h);
+  else drawWordmark(ctx, { x, y: box.y, w: wordW + 2, h: box.h }, getBrand(doc.brand).wordmark, doc.colors.white, doc.colors.orange, fs);
+  x += brandW;
+  if (!inst) return;
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.fillStyle = doc.colors.white;
+  ctx.fillRect(x + GAP, box.y + 10, 2, box.h - 20);
+  ctx.restore();
+  x += GAP * 2 + 2;
+  roundRectPath(ctx, { x, y: box.y, w: tileW, h: box.h }, 12);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.drawImage(inst.source, x + TILE_PAD, cy - iSize.h / 2, iSize.w, iSize.h);
 }
 
 const SHARPEN_AMOUNT = 0.45;
@@ -219,13 +298,11 @@ function drawPattern(ctx: Ctx, region: Rect, tone: Tone, visibility: number) {
   ctx.restore();
 }
 
-function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
+function fitHeadline(ctx: Ctx, doc: PosterDoc, h: HeadlineBox) {
   const text = doc.text.headline.trim().toUpperCase();
-  if (!text) return;
-  const h = g.headline;
-  const main = h.tone === 'dark' ? doc.colors.white : doc.colors.navy;
+  if (!text) return null;
   const fs = getFontSet(doc.fontSet);
-  const fit = fitText(text, {
+  return fitText(text, {
     maxWidth: h.w,
     maxHeight: h.h,
     maxLines: h.maxLines,
@@ -237,6 +314,14 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
       return { measure: (t) => ctx.measureText(t).width, space: ctx.measureText(' ').width };
     },
   });
+}
+
+function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
+  const h = g.headline;
+  const fit = fitHeadline(ctx, doc, h);
+  if (!fit) return;
+  const main = h.tone === 'dark' ? doc.colors.white : doc.colors.navy;
+  const fs = getFontSet(doc.fontSet);
   ctx.font = css(fs.display, fit.size);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -259,12 +344,11 @@ function drawHeadline(ctx: Ctx, doc: PosterDoc, g: Geometry) {
 }
 
 /** Short program description in sentence case, up to two lines, shrinking to fit its box. */
-function drawDescription(ctx: Ctx, doc: PosterDoc, g: Geometry) {
+function fitDescription(ctx: Ctx, doc: PosterDoc, d: Rect) {
   const text = posterDescription(doc.text);
-  if (!text) return;
-  const d = g.description;
+  if (!text) return null;
   const fs = getFontSet(doc.fontSet);
-  const fit = fitText(text, {
+  return fitText(text, {
     maxWidth: d.w,
     maxHeight: d.h,
     maxLines: 2,
@@ -276,6 +360,13 @@ function drawDescription(ctx: Ctx, doc: PosterDoc, g: Geometry) {
       return { measure: (t) => ctx.measureText(t).width, space: ctx.measureText(' ').width };
     },
   });
+}
+
+function drawDescription(ctx: Ctx, doc: PosterDoc, g: Geometry) {
+  const d = g.description;
+  const fit = fitDescription(ctx, doc, d);
+  if (!fit) return;
+  const fs = getFontSet(doc.fontSet);
   ctx.font = css(fs.text, fit.size);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -307,10 +398,22 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
   const lineGap = 6;
 
   ctx.textBaseline = 'alphabetic';
-  const DETAIL_MAX = 400;
-  let detailW = 0;
-  ctx.font = css(fs.meta, 24);
-  for (const l of detail) detailW = Math.max(detailW, Math.min(ctx.measureText(l).width, DETAIL_MAX));
+  // The right-hand block may use whatever the name/location don't need (at least 320px), so lines like
+  // "PUBLIC AND STUDENTS · 181 STUDENTS" are not cut short when the school name is short.
+  ctx.font = css(fs.display, nameSize);
+  let leftNeed = inst ? ctx.measureText(inst).width : 0;
+  ctx.font = css(fs.meta, locSize);
+  if (loc) leftNeed = Math.max(leftNeed, ctx.measureText(loc).width);
+  const DETAIL_MAX = Math.max(320, Math.min(620, right - left - leftNeed - 40));
+  // Shrink the detail text a little (down to 19px) before resorting to an ellipsis.
+  let detailSize = 24;
+  const widest = () => Math.max(0, ...detail.map((l) => ctx.measureText(l.toUpperCase()).width));
+  ctx.font = css(fs.meta, detailSize);
+  while (detailSize > 19 && widest() > DETAIL_MAX) {
+    detailSize -= 1;
+    ctx.font = css(fs.meta, detailSize);
+  }
+  const detailW = Math.min(widest(), DETAIL_MAX);
   const maxLeft = right - left - (detailW ? detailW + 32 : 0);
 
   const blockH = (inst ? nameSize : 0) + (inst && loc ? lineGap : 0) + (loc ? locSize : 0);
@@ -333,7 +436,7 @@ function drawFooter(ctx: Ctx, doc: PosterDoc, g: Geometry) {
     ctx.fillText(ellipsize(loc, maxLeft, (t) => ctx.measureText(t).width), left, y + locSize * 0.85);
   }
   if (detail.length) {
-    ctx.font = css(fs.meta, 24);
+    ctx.font = css(fs.meta, detailSize);
     ctx.textAlign = 'right';
     const lh = 34;
     const top = r.y + (r.h - lh * detail.length) / 2 - 2;
@@ -375,10 +478,14 @@ export function renderPoster(ctx: Ctx, doc: PosterDoc, scale: number, opts: Rend
   }
 
   // Header logos
-  const brandLogo = doc.brandLogos[doc.brand];
-  if (brandLogo) drawLogo(ctx, brandLogo, g.leadersDeskLogo, 'left');
-  else drawWordmark(ctx, g.leadersDeskLogo, getBrand(doc.brand).wordmark, doc.colors.navy, doc.colors.orange, getFontSet(doc.fontSet));
-  if (doc.institutionLogo) drawLogo(ctx, doc.institutionLogo, g.institutionLogo, 'right');
+  if (g.logoAlign === 'center') {
+    drawCenteredLogos(ctx, doc, g.leadersDeskLogo);
+  } else {
+    const brandLogo = doc.brandLogos[doc.brand];
+    if (brandLogo) drawLogo(ctx, brandLogo, g.leadersDeskLogo, 'left');
+    else drawWordmark(ctx, g.leadersDeskLogo, getBrand(doc.brand).wordmark, doc.colors.navy, doc.colors.orange, getFontSet(doc.fontSet));
+    if (doc.institutionLogo) drawLogo(ctx, doc.institutionLogo, g.institutionLogo, 'right');
+  }
 
   // Photos
   const photos = orderedPhotos(doc);

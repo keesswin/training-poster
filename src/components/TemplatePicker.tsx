@@ -14,8 +14,14 @@ function Thumb({ id }: { id: TemplateId }) {
         <R key={i} box={b} fill="#084A91" />
       ))}
       {g.headerCard && <R box={g.headerCard} rx={22} fill="#fff" />}
-      <R box={{ ...g.leadersDeskLogo, y: g.leadersDeskLogo.y + 12, h: 36, w: 150 }} fill="#084A91" opacity={0.85} />
-      <R box={{ x: g.institutionLogo.x + 70, y: g.institutionLogo.y + 10, w: 90, h: 40 }} fill="#9db3cf" />
+      {g.logoAlign === 'center' ? (
+        <R box={{ x: DESIGN_W / 2 - 90, y: g.leadersDeskLogo.y + 12, w: 180, h: 40 }} fill="#fff" opacity={0.9} />
+      ) : (
+        <>
+          <R box={{ ...g.leadersDeskLogo, y: g.leadersDeskLogo.y + 12, h: 36, w: 150 }} fill="#084A91" opacity={0.85} />
+          <R box={{ x: g.institutionLogo.x + 70, y: g.institutionLogo.y + 10, w: 90, h: 40 }} fill="#9db3cf" />
+        </>
+      )}
       <rect x={h.x} y={h.y + 8} width={h.w * 0.9} height={44} fill={h.tone === 'dark' ? '#fff' : '#084A91'} />
       <rect x={h.x} y={h.y + 74} width={h.w * 0.55} height={44} fill="#F07B00" />
       {g.slots.map((s, i) => (

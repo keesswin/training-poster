@@ -42,6 +42,7 @@ const initial: PosterDoc = {
   colors: { ...BRANDS[0].colors },
   patternVisibility: 60,
   brandLogos: { desk: null, foundation: null },
+  brandLogosWhite: { desk: null, foundation: null },
   institutionLogo: null,
   photos: [],
   heroId: null,
@@ -71,6 +72,15 @@ export default function App() {
   useEffect(() => {
     (async () => {
       for (const b of BRANDS) {
+        const white = await defaultLogoFile(b.id, true);
+        if (white) {
+          try {
+            const { image } = await loadImageFile(white, 'logo');
+            setDoc((d) => ({ ...d, brandLogosWhite: { ...d.brandLogosWhite, [b.id]: image } }));
+          } catch {
+            /* ignore a broken white logo; a white version is generated from the normal one */
+          }
+        }
         const file = (await loadSavedBrandLogo(b.id)) ?? (await defaultLogoFile(b.id));
         if (!file) continue;
         try {
@@ -475,7 +485,7 @@ export default function App() {
             </label>
             <label>
               <span>Description <small>(on the poster and in the share message)</small></span>
-              <textarea rows={4} maxLength={240} value={doc.text.description} onChange={(e) => patch({ text: { ...doc.text, description: e.target.value } })} data-testid="description" />
+              <textarea rows={4} maxLength={600} value={doc.text.description} onChange={(e) => patch({ text: { ...doc.text, description: e.target.value } })} data-testid="description" />
             </label>
             <label className="check">
               <input type="checkbox" checked={doc.text.showDescription} onChange={(e) => patch({ text: { ...doc.text, showDescription: e.target.checked } })} data-testid="show-description" /> Show description on the poster
